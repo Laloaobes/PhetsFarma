@@ -1,23 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { ShoppingCart, User as UserIcon, Truck, DollarSign, Plus, Trash2, FlaskConical, Tag, Minus } from 'lucide-react';
 
-// Opciones de descuento para cada ítem (en incrementos del 5%)
-const itemDiscountOptions = [
-  { label: '0%', value: 0 },
-  { label: '5%', value: 0.05 },
-  { label: '10%', value: 0.10 },
-  { label: '15%', value: 0.15 },
-  { label: '20%', value: 0.20 },
-  { label: '25%', value: 0.25 },
-  { label: '30%', value: 0.30 },
-  { label: '35%', value: 0.35 },
-  { label: '40%', value: 0.40 },
-  { label: '45%', value: 0.45 },
-  { label: '50%', value: 0.50 },
-];
-
-const ProductRow = ({ item, index, onUpdate, onRemove, productList, laboratory }) => {
+const ProductRow = ({ item, index, onUpdate, onRemove, productList, laboratory, user, maxDiscountPercentage }) => {
   const [showBonus, setShowBonus] = useState(false);
+
+  // Opciones de descuento dinámicas basadas en maxDiscountPercentage
+  const itemDiscountOptions = Array.from({ length: Math.floor(maxDiscountPercentage / 0.05) + 1 }, (_, i) => ({
+    label: `${(i * 5)}%`,
+    value: (i * 0.05)
+  }));
 
   // Calcula el subtotal, descuento y total para este ítem
   const quantity = parseFloat(item.quantity) || 0;
@@ -40,7 +31,7 @@ const ProductRow = ({ item, index, onUpdate, onRemove, productList, laboratory }
       
       updatedItem = {
         ...item,
-        sku: product.id,
+        sku: product.code, // Asignar el código del producto como SKU
         productName: product.name,
         price: selectedPrice.toFixed(2),
         total: newTotal, // Asegúrate de que item.total se actualice correctamente
@@ -72,6 +63,9 @@ const ProductRow = ({ item, index, onUpdate, onRemove, productList, laboratory }
     }
   };
 
+  // Permiso para cambiar precio: Siempre mostrar fijo, no editable.
+  // La lógica canEditPrice ha sido eliminada.
+
   return (
     <div className="flex flex-col p-3 bg-gray-50 rounded-lg mb-4 shadow-sm border border-gray-200">
       <div className="grid grid-cols-1 md:grid-cols-12 gap-2 items-center">
@@ -82,7 +76,9 @@ const ProductRow = ({ item, index, onUpdate, onRemove, productList, laboratory }
         </div>
         {/* Selección de Producto */}
         <div className="col-span-1 md:col-span-3">
+          <label htmlFor={`product-${index}`} className="block text-gray-700 text-xs font-semibold mb-1">Producto</label>
           <select
+            id={`product-${index}`}
             value={item.productName}
             onChange={(e) => handleProductSelect(e.target.value)}
             className="w-full p-2 border rounded-md bg-white text-sm"
@@ -97,38 +93,57 @@ const ProductRow = ({ item, index, onUpdate, onRemove, productList, laboratory }
           </select>
         </div>
         {/* Cantidad */}
-        <input
-          type="number"
-          placeholder="Cant."
-          value={item.quantity}
-          onChange={(e) => handleInputChange("quantity", e.target.value)}
-          className="col-span-1 md:col-span-1 p-2 border rounded-md text-sm"
-        />
-        {/* Bonus */}
-        <div className="col-span-1 md:col-span-1 flex items-center">
-          <button onClick={toggleBonus} className="text-blue-600 hover:text-blue-800 p-1 rounded-full bg-blue-100 mr-1">
-            {showBonus ? <Minus size={16} /> : <Tag size={16} />}
-          </button>
-          {showBonus && (
-            <input
-              type="number"
-              placeholder="Bonus"
-              value={item.bonus}
-              onChange={(e) => handleInputChange("bonus", e.target.value)}
-              className="w-full p-2 border rounded-md text-sm"
-            />
-          )}
+        <div className="col-span-1 md:col-span-1">
+          <label htmlFor={`quantity-${index}`} className="block text-gray-700 text-xs font-semibold mb-1">Cant.</label>
+          <input
+            id={`quantity-${index}`}
+            type="number"
+            placeholder="Cant."
+            value={item.quantity}
+            onChange={(e) => handleInputChange("quantity", e.target.value)}
+            className="w-full p-2 border rounded-md text-sm"
+          />
         </div>
-        {/* Precio (no editable, ahora col-span-2) */}
-        <div className="col-span-1 md:col-span-2 flex items-center"> {/* Aumentado de col-span-1 a col-span-2 */}
-          <span className="text-gray-500 mr-1 text-sm">$</span>
-          <span className="font-medium text-gray-800 p-2 bg-white border rounded-md w-full text-sm"> {/* Puesto de nuevo a p-2 para altura consistente */}
-            {parseFloat(item.price).toFixed(2)}
-          </span>
+        {/* Bonus */}
+        <div className="col-span-1 md:col-span-1">
+          <label htmlFor={`bonus-${index}`} className="block text-gray-700 text-xs font-semibold mb-1">Bonus</label>
+          <div className="flex items-center">
+            <button onClick={toggleBonus} className="text-blue-600 hover:text-blue-800 p-1 rounded-full bg-blue-100 mr-1">
+              {showBonus ? <Minus size={16} /> : <Tag size={16} />}
+            </button>
+            {showBonus && (
+              <input
+                id={`bonus-${index}`}
+                type="number"
+                placeholder="Bonus"
+                value={item.bonus}
+                onChange={(e) => handleInputChange("bonus", e.target.value)}
+                className="w-full p-2 border rounded-md text-sm"
+              />
+            )}
+            {!showBonus && (
+              <span className="w-full p-2 border rounded-md bg-white text-sm text-gray-700">
+                {item.bonus || 0}
+              </span>
+            )}
+          </div>
+        </div>
+        {/* Precio Unitario (ahora fijo, no editable para nadie) */}
+        <div className="col-span-1 md:col-span-2">
+          <label htmlFor={`price-${index}`} className="block text-gray-700 text-xs font-semibold mb-1">Precio Unit.</label>
+          <div className="flex items-center">
+            <span className="text-gray-500 mr-1 text-sm">$</span>
+            {/* Siempre se muestra como span, no como input */}
+            <span className="font-medium text-gray-800 p-2 bg-white border rounded-md w-full text-sm">
+              {parseFloat(item.price).toFixed(2)}
+            </span>
+          </div>
         </div>
         {/* Descuento por ítem */}
-        <div className="col-span-1 md:col-span-1 flex items-center">
+        <div className="col-span-1 md:col-span-1">
+          <label htmlFor={`discount-${index}`} className="block text-gray-700 text-xs font-semibold mb-1">Desc. (%)</label>
           <select
+            id={`discount-${index}`}
             value={item.discount}
             onChange={(e) => handleInputChange("discount", parseFloat(e.target.value))}
             className="w-full p-2 border rounded-md text-sm"
@@ -141,14 +156,16 @@ const ProductRow = ({ item, index, onUpdate, onRemove, productList, laboratory }
           </select>
         </div>
         {/* Totales individuales por producto (más concisos) */}
-        <div className="col-span-1 md:col-span-2 flex flex-col items-end text-right"> {/* Reducido a col-span-2 */}
-          {itemDiscountAmount > 0 && ( // Solo muestra subtotal si hay descuento
+        <div className="col-span-1 md:col-span-2 flex flex-col items-end text-right">
+          {itemDiscountAmount > 0 ? ( // Solo muestra subtotal si hay descuento
             <span className="text-xs text-gray-600">Subt: ${rawItemSubtotal.toFixed(2)}</span>
+          ) : (
+            <span className="text-xs text-gray-600">&nbsp;</span> // Espacio para mantener la alineación si no hay subtot
           )}
           <span className="font-bold text-gray-800 text-sm">Total: ${itemFinalTotal.toFixed(2) || "0.00"}</span>
         </div>
         {/* Botón de Eliminar */}
-        <div className="col-span-1 md:col-span-1 flex justify-end">
+        <div className="col-span-1 md:col-span-1 flex justify-end items-center">
           <button onClick={() => onRemove(index)} className="p-2 text-red-500 hover:text-red-700">
             <Trash2 size={20} />
           </button>
@@ -158,25 +175,45 @@ const ProductRow = ({ item, index, onUpdate, onRemove, productList, laboratory }
   );
 };
 
-export default function OrderForm({ onSaveOrder, products, clients, sellers, distributors, laboratories }) {
-  const [seller, setSeller] = useState("");
+export default function OrderForm({ onSaveOrder, products, clients, sellers, distributors, laboratories, user }) {
+  // Estado inicial del vendedor y distribuidor para el rol 'Vendedor'
+  const [seller, setSeller] = useState(user && user.role === 'Vendedor' ? user.name : "");
   const [client, setClient] = useState("");
-  const [distributor, setDistributor] = useState("");
-  const [laboratory, setLaboratory] = useState("");
-  const [items, setItems] = useState([{ sku: "", productName: "", quantity: "1", bonus: "0", price: "", discount: "0", total: "0.00" }]);
+  const [distributor, setDistributor] = useState(user && user.role === 'Vendedor' ? user.name : ""); // Los distribuidores también pueden ser 'Vendedor'
+
+  const [laboratory, setLaboratory] = useState(user && user.role === 'Gerente de laboratorio' ? user.laboratory : "");
+
+  const [items, setItems] = useState([{ sku: "", productName: "", quantity: "1", bonus: "0", price: "0.00", discount: "0", total: "0.00" }]);
   
-  const [rawSubtotal, setRawSubtotal] = useState(0); // Subtotal de todos los ítems antes de cualquier descuento
-  const [itemLevelDiscountAmount, setItemLevelDiscountAmount] = useState(0); // Monto total de los descuentos aplicados por ítem en todo el pedido
-  const [finalTotal, setFinalTotal] = useState(0); // Total final de todo el pedido (con descuentos por ítem)
+  const [rawSubtotal, setRawSubtotal] = useState(0); 
+  const [itemLevelDiscountAmount, setItemLevelDiscountAmount] = useState(0); 
+  const [finalTotal, setFinalTotal] = useState(0); 
+
+  const [globalDiscount, setGlobalDiscount] = useState(0); 
 
   const [showModal, setShowModal] = useState(false);
   const [modalMessage, setModalMessage] = useState("");
 
-  const productsByLaboratory = products[laboratory] || [];
+  // Filtrar productos por el laboratorio del gerente si aplica
+  const productsByLaboratory = (user && user.role === 'Gerente de laboratorio') 
+    ? (products[user.laboratory] || [])
+    : (products[laboratory] || []);
+
+  // Calcular el máximo descuento permitido para el laboratorio seleccionado
+  const getMaxDiscountPercentageForLab = () => {
+    if (laboratory === 'Phetsfarma' || laboratory === 'Vets Pharma') {
+      return 0.65; // 65% para Phetsfarma y Vets Pharma
+    } else if (laboratory === 'Kiron') {
+      return 0.30; // 30% para Kiron
+    }
+    return 0; // Sin descuento por defecto
+  };
+
+  const maxDiscountAllowed = getMaxDiscountPercentageForLab();
 
   useEffect(() => {
-    let currentRawSubtotal = 0; // Suma de (cantidad * precio) sin descuentos por ítem
-    let currentTotalWithItemDiscounts = 0; // Suma de (cantidad * precio * (1 - descuento_item))
+    let currentRawSubtotal = 0; 
+    let currentTotalWithItemDiscounts = 0; 
 
     items.forEach(item => {
       const quantity = parseFloat(item.quantity) || 0;
@@ -193,6 +230,13 @@ export default function OrderForm({ onSaveOrder, products, clients, sellers, dis
 
   }, [items]);
 
+  // Efecto para resetear los items cuando el laboratorio cambia
+  useEffect(() => {
+    setItems([{ sku: "", productName: "", quantity: "1", bonus: "0", price: "0.00", discount: "0", total: "0.00" }]);
+    setGlobalDiscount(0); 
+  }, [laboratory]);
+
+
   const handleUpdateItem = (index, updatedItem) => {
     const newItems = [...items];
     newItems[index] = updatedItem;
@@ -200,7 +244,7 @@ export default function OrderForm({ onSaveOrder, products, clients, sellers, dis
   };
 
   const handleAddItem = () => {
-    setItems([...items, { sku: "", productName: "", quantity: "1", bonus: "0", price: "", discount: "0", total: "0.00" }]);
+    setItems([...items, { sku: "", productName: "", quantity: "1", bonus: "0", price: "0.00", discount: "0", total: "0.00" }]);
   };
 
   const handleRemoveItem = (index) => {
@@ -224,7 +268,7 @@ export default function OrderForm({ onSaveOrder, products, clients, sellers, dis
       items,
       subtotal: rawSubtotal,
       discountAmount: itemLevelDiscountAmount,
-      appliedGlobalDiscount: itemLevelDiscountAmount > 0 && rawSubtotal > 0 ? (itemLevelDiscountAmount / rawSubtotal) : 0,
+      appliedGlobalDiscount: globalDiscount, 
       grandTotal: finalTotal,
     };
     onSaveOrder(order);
@@ -249,39 +293,90 @@ export default function OrderForm({ onSaveOrder, products, clients, sellers, dis
         </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <div className="flex items-center bg-gray-100 p-3 rounded-lg">
-            <FlaskConical className="text-gray-500 mr-3" />
-            <select value={laboratory} onChange={(e) => setLaboratory(e.target.value)} className="w-full bg-transparent focus:outline-none">
-              <option value="">Selecciona Laboratorio</option>
-              {laboratories.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}
-            </select>
+          {/* Laboratorio */}
+          <div className="flex flex-col bg-gray-100 p-3 rounded-lg">
+            <label htmlFor="laboratory-select" className="block text-gray-700 text-xs font-semibold mb-1">Laboratorio</label>
+            <div className="flex items-center">
+              <FlaskConical className="text-gray-500 mr-3" />
+              <select 
+                id="laboratory-select"
+                value={laboratory} 
+                onChange={(e) => setLaboratory(e.target.value)} 
+                className="w-full bg-transparent focus:outline-none"
+                disabled={user && user.role === 'Gerente de laboratorio'} 
+              >
+                <option value="">Selecciona Laboratorio</option>
+                {laboratories.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}
+              </select>
+            </div>
           </div>
-          <div className="flex items-center bg-gray-100 p-3 rounded-lg">
-            <UserIcon className="text-gray-500 mr-3" />
-            <select value={seller} onChange={(e) => setSeller(e.target.value)} className="w-full bg-transparent focus:outline-none">
-              <option value="">Selecciona Vendedor</option>
-              {sellers.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
-            </select>
+          {/* Vendedor */}
+          <div className="flex flex-col bg-gray-100 p-3 rounded-lg">
+            <label htmlFor="seller-select" className="block text-gray-700 text-xs font-semibold mb-1">Vendedor</label>
+            <div className="flex items-center">
+              <UserIcon className="text-gray-500 mr-3" />
+              <select 
+                id="seller-select"
+                value={seller} 
+                onChange={(e) => setSeller(e.target.value)} 
+                className="w-full bg-transparent focus:outline-none"
+                disabled={user && user.role === 'Vendedor'} 
+              >
+                <option value="">Selecciona Vendedor</option>
+                {/* Los sellers se rellenarían desde data.sellers si tuvieran datos */}
+                {sellers.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+              </select>
+            </div>
           </div>
-          <div className="flex items-center bg-gray-100 p-3 rounded-lg">
-            <Truck className="text-gray-500 mr-3" />
-            <select value={distributor} onChange={(e) => { setDistributor(e.target.value); }} className="w-full bg-transparent focus:outline-none">
-              <option value="">Selecciona Distribuidor</option>
-              {distributors.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
-            </select>
+          {/* Distribuidor */}
+          <div className="flex flex-col bg-gray-100 p-3 rounded-lg">
+            <label htmlFor="distributor-select" className="block text-gray-700 text-xs font-semibold mb-1">Distribuidor</label>
+            <div className="flex items-center">
+              <Truck className="text-gray-500 mr-3" />
+              <select 
+                id="distributor-select"
+                value={distributor} 
+                onChange={(e) => { setDistributor(e.target.value); }} 
+                className="w-full bg-transparent focus:outline-none"
+                disabled={user && user.role === 'Vendedor'} // Asumiendo que un Vendedor puede ser también un "Representante Distribuidor"
+              >
+                <option value="">Selecciona Distribuidor</option>
+                {distributors.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+              </select>
+            </div>
           </div>
-          <div className="flex items-center bg-gray-100 p-3 rounded-lg">
-            <UserIcon className="text-gray-500 mr-3" />
-            <select value={client} onChange={(e) => setClient(e.target.value)} className="w-full bg-transparent focus:outline-none" required>
-              <option value="">Selecciona Cliente *</option>
-              {clients.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-            </select>
+          {/* Cliente */}
+          <div className="flex flex-col bg-gray-100 p-3 rounded-lg">
+            <label htmlFor="client-select" className="block text-gray-700 text-xs font-semibold mb-1">Cliente *</label>
+            <div className="flex items-center">
+              <UserIcon className="text-gray-500 mr-3" />
+              <select 
+                id="client-select"
+                value={client} 
+                onChange={(e) => setClient(e.target.value)} 
+                className="w-full bg-transparent focus:outline-none" 
+                required
+              >
+                <option value="">Selecciona Cliente</option>
+                {clients.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+              </select>
+            </div>
           </div>
         </div>
 
         <div className="mb-4">
           {items.map((item, index) => (
-            <ProductRow key={index} index={index} item={item} onUpdate={handleUpdateItem} onRemove={handleRemoveItem} productList={productsByLaboratory} laboratory={laboratory} />
+            <ProductRow 
+              key={index} 
+              index={index} 
+              item={item} 
+              onUpdate={handleUpdateItem} 
+              onRemove={handleRemoveItem} 
+              productList={productsByLaboratory} 
+              laboratory={laboratory} 
+              user={user} 
+              maxDiscountPercentage={maxDiscountAllowed} 
+            />
           ))}
         </div>
 
@@ -295,9 +390,14 @@ export default function OrderForm({ onSaveOrder, products, clients, sellers, dis
         <div className="flex justify-end items-end flex-col mb-6">
           <div className="text-right w-full max-w-xs">
             {/* Subtotal de todo el pedido (sin descuento por ítem) - solo aparece si hay descuento aplicado en el pedido */}
-            {itemLevelDiscountAmount > 0 && (
+            {itemLevelDiscountAmount > 0 ? (
               <div className="flex justify-between py-1">
                 <span className="text-gray-600">Subtotal del Pedido (sin descuento):</span>
+                <span className="font-medium text-gray-800">${rawSubtotal.toFixed(2)}</span>
+              </div>
+            ) : (
+              <div className="flex justify-between py-1">
+                <span className="text-gray-600">Subtotal del Pedido:</span>
                 <span className="font-medium text-gray-800">${rawSubtotal.toFixed(2)}</span>
               </div>
             )}

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Printer, Share2, Plus, ArrowLeft } from 'lucide-react';
 
-export default function OrderSummary({ order, onNavigate, previousView, onPrint }) {
+export default function OrderSummary({ order, onNavigate, previousView, onPrint, user }) {
   if (!order) {
     return (
       <div className="flex flex-col items-center justify-center p-8 bg-white rounded-lg shadow-md max-w-lg mx-auto">
@@ -28,7 +28,8 @@ export default function OrderSummary({ order, onNavigate, previousView, onPrint 
     message += `Pedido ID: #${order.id}\n`;
     message += `Fecha: ${new Date(order.date).toLocaleDateString()}\n`;
     message += `Cliente: ${order.client}\n`;
-    message += `Vendedor: ${order.seller}\n`;
+    message += `Representante/Promotor: ${order.seller}\n`; // Nombre de rol actualizado
+    message += `Distribuidor: ${order.distributor || 'N/A'}\n`; // Nuevo rol/campo
     message += `Laboratorio: ${order.laboratory}\n\n`;
 
     message += `Productos:\n`;
@@ -38,11 +39,12 @@ export default function OrderSummary({ order, onNavigate, previousView, onPrint 
       message += `- ${item.productName} (Cant: ${item.quantity}${bonusText}, Precio: $${parseFloat(item.price).toFixed(2)}, Desc: ${itemDiscountPercentage}%) Total: $${parseFloat(item.total).toFixed(2)}\n`;
     });
 
-    message += `\nSubtotal: $${order.subtotal.toFixed(2)}\n`;
-    
-    if (order.discountAmount > 0 && typeof order.appliedGlobalDiscount === 'number') {
-      const globalDiscountPercentage = (order.appliedGlobalDiscount * 100).toFixed(0);
-      message += `Descuento Global (${globalDiscountPercentage}%): -$${order.discountAmount.toFixed(2)}\n`;
+    // En el mensaje de WhatsApp, siempre mostrar subtotal y descuento si existen, para dar detalle
+    if (order.subtotal !== order.grandTotal) {
+      message += `\nSubtotal: $${order.subtotal.toFixed(2)}\n`;
+      if (order.discountAmount > 0) { // Siempre que haya descuento, mostrar el monto
+        message += `Descuento aplicado: -$${order.discountAmount.toFixed(2)}\n`;
+      }
     }
     message += `Total Final: $${order.grandTotal.toFixed(2)}`;
 
@@ -51,7 +53,7 @@ export default function OrderSummary({ order, onNavigate, previousView, onPrint 
   };
 
   const returnInfo = previousView === 'reports'
-    ? { text: 'Volver a Reportes', action: () => onNavigate('reports'), icon: <ArrowLeft className="mr-2" /> }
+    ? { text: 'Volver a Reportes', action: () => onNavigate('reports', null), icon: <ArrowLeft className="mr-2" /> }
     : { text: 'Hacer Otro Pedido', action: () => onNavigate('orderForm'), icon: <Plus className="mr-2" /> };
 
   return (
@@ -61,7 +63,7 @@ export default function OrderSummary({ order, onNavigate, previousView, onPrint 
       </h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-y-2 gap-x-6 mb-6 text-sm text-gray-600">
         <div><strong>Cliente:</strong> {order.client || 'N/A'}</div>
-        <div><strong>Vendedor:</strong> {order.seller || 'N/A'}</div>
+        <div><strong>Representante/Promotor:</strong> {order.seller || 'N/A'}</div> {/* Nombre de rol actualizado */}
         <div><strong>Distribuidor:</strong> {order.distributor || 'N/A'}</div>
         <div><strong>Laboratorio:</strong> {order.laboratory || 'N/A'}</div>
         <div><strong>Fecha:</strong> {new Date(order.date).toLocaleDateString()}</div>
@@ -87,18 +89,7 @@ export default function OrderSummary({ order, onNavigate, previousView, onPrint 
         ))}
       </div>
       <div className="flex flex-col items-end mt-6 space-y-2">
-        {order.subtotal !== order.grandTotal && (
-          <div className="flex justify-between w-full max-w-sm text-gray-600">
-            <span>Subtotal:</span>
-            <span>${order.subtotal.toFixed(2)}</span>
-          </div>
-        )}
-        {order.discountAmount > 0 && typeof order.appliedGlobalDiscount === 'number' && (
-          <div className="flex justify-between w-full max-w-sm text-red-500 font-semibold">
-            <span>Descuento Global ({(order.appliedGlobalDiscount * 100).toFixed(0)}%):</span> 
-            <span>-${order.discountAmount.toFixed(2)}</span>
-          </div>
-        )}
+        {/* Aquí solo mostraremos el Total Final, como en la imagen del PDF */}
         <div className="flex justify-between w-full max-w-sm text-gray-800">
           <span className="text-2xl font-bold">Total:</span>
           <span className="text-2xl font-bold">${order.grandTotal.toFixed(2)}</span>

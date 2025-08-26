@@ -6,56 +6,135 @@ import OrderSummary from './components/OrderSummary';
 import Reports from './components/ReportsView';
 import GenericManagement from './components/GenericManagement';
 import ProductManagement from './components/ProductManagement';
+import UserManagement from './components/UserManagement'; 
 import Login from './components/Login'; 
 
-import { phetsfarmaProducts, kironProducts, laboratorioXProducts } from './data/productList'; 
+import { phetsfarmaProducts, kironProducts, vetsPharmaProducts } from './data/productList'; 
 
 // Datos de ejemplo para la aplicación
 const initialData = {
-  // Se eliminan los datos iniciales para que se puedan agregar manualmente
+  // Los siguientes arrays se han vaciado para que se puedan agregar manualmente a través de la interfaz
   sellers: [],
   clients: [],
   distributors: [],
   laboratories: [
     { id: 1, name: 'Phetsfarma' },
     { id: 2, name: 'Kiron' },
-    { id: 3, name: 'Laboratorio X' },
+    { id: 3, name: 'Vets Pharma' }, 
   ],
+  users: [ 
+    { id: 1, username: 'superadmin', password: 'password', name: 'Admin General', role: 'Super Admin' },
+    { id: 2, username: 'admin', password: 'password', name: 'Administrador', role: 'Admin' },
+    { id: 3, username: 'gerente_kiron', password: 'password', name: 'Gerente Kiron', role: 'Gerente de laboratorio', laboratory: 'Kiron' },
+    { id: 4, username: 'gerente_phetsfarma', password: 'password', name: 'Gerente Phetsfarma', role: 'Gerente de laboratorio', laboratory: 'Phetsfarma' },
+    { id: 5, username: 'gerente_vetspharma', password: 'password', name: 'Gerente Vets Pharma', role: 'Gerente de laboratorio', laboratory: 'Vets Pharma' },
+    { id: 6, username: 'coordinador_ventas', password: 'password', name: 'Coordinador Ventas', role: 'Coordinador de vendedores' }, // Rol actualizado
+    { id: 7, username: 'vendedor_ana', password: 'password', name: 'Vendedor Ana', role: 'Vendedor' }, // Nuevo rol consolidado
+    { id: 8, username: 'vendedor_carlos', password: 'password', name: 'Vendedor Carlos', role: 'Vendedor' }, // Nuevo rol consolidado
+  ]
 };
-
-// Se definen las opciones de descuento global en incrementos del 5%
-const globalDiscountOptions = [
-  { label: '0%', value: 0 },
-  { label: '5%', value: 0.05 },
-  { label: '10%', value: 0.10 },
-  { label: '15%', value: 0.15 },
-  { label: '20%', value: 0.20 },
-  { label: '25%', value: 0.25 },
-];
-
 
 // Productos iniciales, estructurados directamente por laboratorio usando los imports
 const initialProductsByLab = {
   'Phetsfarma': phetsfarmaProducts, 
   'Kiron': kironProducts,
-  'Laboratorio X': laboratorioXProducts
+  'Vets Pharma': vetsPharmaProducts 
 };
 
+// Función para generar 15 órdenes de ejemplo con diferentes fechas de agosto de 2025
+const generateSampleOrders = () => {
+  const sampleSellers = ['Vendedor Ana', 'Vendedor Carlos', 'Juan Pérez']; // Nombres de vendedores de ejemplo
+  const sampleClients = ['Veterinaria Central', 'Pet Shop Feliz', 'Animalandia'];
+  const sampleDistributors = ['Distribuidora A', 'Distribuidora B', 'DistriVet']; // Los distribuidores no son roles de usuario directo aquí
+  const sampleLaboratories = ['Phetsfarma', 'Kiron', 'Vets Pharma'];
 
-// Órdenes iniciales de ejemplo
-const initialOrders = [
-  {
-    id: 1, date: '2025-08-20T10:00:00Z', seller: 'Juan Pérez', client: 'Veterinaria El Gato Feliz', distributor: 'Distribuidora A', laboratory: 'Phetsfarma',
-    items: [
-      { productName: 'ACUACIDE BOTE 1 LT', quantity: 2, bonus: 0, price: '300.00', discount: 0, total: '600.00' },
-      { productName: 'AMOXILAND 100 ML', quantity: 1, bonus: 0, price: '110.00', discount: 0, total: '110.00' },
-    ],
-    subtotal: 710.00, discountAmount: 0, appliedGlobalDiscount: 0, grandTotal: 710.00
-  },
-];
+  const allProducts = [
+    ...phetsfarmaProducts,
+    ...kironProducts,
+    ...vetsPharmaProducts
+  ];
+
+  const orders = [];
+  for (let i = 0; i < 15; i++) {
+    const orderId = 1000 + i;
+    const day = (i % 31) + 1; // Días del 1 al 15 o más, para agosto
+    const date = new Date(2025, 7, day, 9 + (i % 10), (i * 5) % 60, 0).toISOString(); // Mes 7 es agosto (0-indexado)
+
+    const seller = sampleSellers[Math.floor(Math.random() * sampleSellers.length)];
+    const client = sampleClients[Math.floor(Math.random() * sampleClients.length)];
+    const distributor = sampleDistributors[Math.floor(Math.random() * sampleDistributors.length)];
+    const laboratory = sampleLaboratories[Math.floor(Math.random() * sampleLaboratories.length)];
+
+    const numItems = Math.floor(Math.random() * 3) + 1; // 1 a 3 ítems por pedido
+    let orderItems = [];
+    let currentOrderSubtotal = 0;
+
+    // Asegurarse de que los productos para el laboratorio seleccionado existan
+    const availableLabProducts = allProducts.filter(p => p.laboratory === laboratory);
+    
+    if (availableLabProducts.length === 0) {
+        console.warn(`No hay productos definidos para el laboratorio ${laboratory}. Saltando esta orden de ejemplo.`);
+        continue; 
+    }
+
+    // Determinar el descuento máximo basado en el laboratorio
+    let maxDiscountForLab = 0.30; // Default 30% para Kiron
+    if (laboratory === 'Phetsfarma' || laboratory === 'Vets Pharma') {
+      maxDiscountForLab = 0.65; // 65% para Phetsfarma y Vets Pharma
+    }
+
+    for (let j = 0; j < numItems; j++) {
+        const randomProduct = availableLabProducts[Math.floor(Math.random() * availableLabProducts.length)];
+        
+        const quantity = Math.floor(Math.random() * 5) + 1; // 1 a 5 unidades
+        const bonus = Math.floor(Math.random() * 2); // 0 o 1 bonus
+        const price = randomProduct.price;
+        
+        // Generar un descuento aleatorio dentro del rango permitido para el laboratorio
+        const maxIncrements = Math.floor(maxDiscountForLab / 0.05); // Número de incrementos de 5%
+        const discount = (Math.floor(Math.random() * (maxIncrements + 1)) * 0.05); // Incluye 0%
+
+        const itemTotal = ((quantity + bonus) * price * (1 - discount));
+        
+        orderItems.push({
+            sku: randomProduct.id, // Usar el ID del producto como SKU
+            productName: randomProduct.name,
+            quantity: quantity.toString(),
+            bonus: bonus.toString(),
+            price: price.toFixed(2),
+            discount: discount.toFixed(2),
+            total: itemTotal.toFixed(2),
+        });
+        currentOrderSubtotal += itemTotal;
+    }
+    
+    const finalSubtotal = parseFloat(currentOrderSubtotal.toFixed(2));
+    const finalDiscountAmount = 0; 
+    const finalGrandTotal = finalSubtotal - finalDiscountAmount;
+
+    orders.push({
+      id: orderId,
+      date,
+      seller,
+      client,
+      distributor,
+      laboratory,
+      items: orderItems,
+      subtotal: finalSubtotal,
+      discountAmount: finalDiscountAmount,
+      appliedGlobalDiscount: 0,
+      grandTotal: finalGrandTotal,
+    });
+  }
+  return orders;
+};
+
+// Órdenes iniciales de ejemplo generadas
+const initialOrders = generateSampleOrders();
+
 
 export default function App() {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(null); // Objeto de usuario con rol
   const [currentView, setCurrentView] = useState('login'); 
   const [lastView, setLastView] = useState('login'); 
   const [orders, setOrders] = useState(initialOrders);
@@ -74,16 +153,10 @@ export default function App() {
   }, []);
 
   // Función para manejar el login
-  const handleLogin = (username, password) => {
-    // Verificación de credenciales de ejemplo
-    if (username === "admin" && password === "admin123") { 
-      const userData = { username: "admin", isAdmin: true };
-      setUser(userData);
-      localStorage.setItem("salesUser", JSON.stringify(userData)); 
-      setCurrentView("orderForm"); 
-    } else {
-      alert("Credenciales incorrectas."); 
-    }
+  const handleLogin = (loggedInUser) => {
+    setUser(loggedInUser);
+    localStorage.setItem("salesUser", JSON.stringify(loggedInUser)); 
+    setCurrentView("orderForm"); 
   };
 
   // Función para manejar el logout
@@ -105,7 +178,7 @@ export default function App() {
     handleNavigate('orderSummary', newOrder); 
   };
 
-  // Función de impresión con estilo de OrderSummary
+  // Función de impresión con estilo EXACTO de la imagen proporcionada
   const handlePrint = (order) => {
     if (!order) {
       console.error("No hay orden para imprimir.");
@@ -214,12 +287,12 @@ export default function App() {
         max-width: 300px; /* Ancho fijo para la sección de totales */
         padding: 4px 0; /* Espaciado para la fila del total */
       }
-      .total-row.grand-total-text { 
+      .total-row .total-label { 
         font-size: 1.8rem; /* text-3xl */
         font-weight: 700; /* font-bold */
         color: #1f2937; /* text-gray-800 */
       }
-      .total-row.grand-total-value { 
+      .total-row .total-value { 
         font-size: 1.8rem; /* text-3xl */
         font-weight: 700; /* font-bold */
         color: #1f2937; /* text-gray-800 */
@@ -264,7 +337,7 @@ export default function App() {
     let printContentHtml = `
       <div class="print-page-container">
         <h1>
-          <span class="icon"></span> Resumen de Pedido
+          <span class="icon">⎙</span> Resumen de Pedido
         </h1>
         <div class="info-grid">
           <div><strong>Cliente:</strong> ${order.client || 'N/A'}</div>
@@ -281,8 +354,8 @@ export default function App() {
         </div>
         <div class="totals-section">
           <div class="total-row">
-            <span class="grand-total-text">Total:</span>
-            <span class="grand-total-value">$${order.grandTotal.toFixed(2)}</span>
+            <span class="total-label">Total:</span>
+            <span class="total-value">$${order.grandTotal.toFixed(2)}</span>
           </div>
         </div>
         <div class="footer-text">
@@ -320,7 +393,14 @@ export default function App() {
       }));
     },
     handleDeleteItem: (id) => {
-      if (window.confirm(`¿Estás seguro de que quieres eliminar este ${key.slice(0, -1)}?`)) {
+      // Confirmación de eliminación solo para elementos que no son usuarios
+      if (key !== 'users' && window.confirm(`¿Estás seguro de que quieres eliminar este ${key.slice(0, -1)}?`)) {
+        setData(prevData => ({
+          ...prevData,
+          [key]: prevData[key].filter(item => item.id !== id)
+        }));
+      } else if (key === 'users') {
+        // La lógica de confirmación para usuarios se maneja dentro de UserManagement.js
         setData(prevData => ({
           ...prevData,
           [key]: prevData[key].filter(item => item.id !== id)
@@ -329,19 +409,20 @@ export default function App() {
     },
   });
 
+  // Handlers específicos para productos
   const productHandlers = {
     handleAddItem: (item) => {
       const laboratoryName = item.laboratory;
       setProducts(prevProducts => ({
         ...prevProducts,
-        [laboratoryName]: [...(prevProducts[laboratoryName] || []), { ...item, id: Date.now() }]
+        [laboratoryName]: [...(prevProducts[laboratoryName] || []), { ...item, id: Date.now(), sku: item.id }] // Asegurarse de que el SKU se guarda con el ID
       }));
     },
     handleUpdateItem: (updatedItem) => {
       const laboratoryName = updatedItem.laboratory;
       setProducts(prevProducts => ({
         ...prevProducts,
-        [laboratoryName]: prevProducts[laboratoryName].map(item => item.id === updatedItem.id ? updatedItem : item)
+        [laboratoryName]: prevProducts[laboratoryName].map(item => item.id === updatedItem.id ? { ...updatedItem, sku: updatedItem.id } : item) // Actualizar SKU también
       }));
     },
     handleDeleteItem: (id, laboratoryName) => {
@@ -369,7 +450,7 @@ export default function App() {
             sellers={data.sellers}
             distributors={data.distributors}
             laboratories={data.laboratories}
-            globalDiscountOptions={globalDiscountOptions} 
+            user={user} // Pasar el usuario
           />
         );
       case 'orderSummary':
@@ -379,6 +460,7 @@ export default function App() {
             onNavigate={handleNavigate}
             previousView={lastView}
             onPrint={handlePrint}
+            user={user} // Pasar el usuario
           />
         );
       case 'reports':
@@ -390,6 +472,7 @@ export default function App() {
             distributors={data.distributors}
             laboratories={data.laboratories}
             products={products} 
+            user={user} // Pasar el usuario
           />
         );
       case 'manageClients':
@@ -398,22 +481,25 @@ export default function App() {
             items={data.clients}
             handlers={genericHandlers('clients')}
             itemName="Cliente"
+            user={user} // Pasar el usuario
           />
         );
-      case 'manageSellers':
+      case 'manageSellers': // Ahora gestionará a los Vendedores
         return (
           <GenericManagement
             items={data.sellers}
             handlers={genericHandlers('sellers')}
-            itemName="Vendedor"
+            itemName="Vendedor" // Nombre actualizado
+            user={user} // Pasar el usuario
           />
         );
-      case 'manageDistributors':
+      case 'manageDistributors': // Los distribuidores se gestionan por separado si no son usuarios
         return (
           <GenericManagement
             items={data.distributors}
             handlers={genericHandlers('distributors')}
             itemName="Distribuidor"
+            user={user} // Pasar el usuario
           />
         );
       case 'manageLaboratories':
@@ -422,6 +508,7 @@ export default function App() {
             items={data.laboratories}
             handlers={genericHandlers('laboratories')}
             itemName="Laboratorio"
+            user={user} // Pasar el usuario (fundamental para el permiso)
           />
         );
       case 'manageProducts':
@@ -430,6 +517,16 @@ export default function App() {
             products={products} 
             laboratories={data.laboratories}
             handlers={productHandlers}
+            user={user} // Pasar el usuario
+          />
+        );
+      case 'manageUsers': 
+        return (
+          <UserManagement
+            users={data.users} 
+            handlers={genericHandlers('users')} 
+            laboratories={data.laboratories} 
+            user={user} 
           />
         );
       default:
@@ -453,6 +550,7 @@ export default function App() {
           onNavigate={handleNavigate}
           onLogout={handleLogout}
           currentView={currentView}
+          user={user} // Pasar el usuario al AdminPanel
         />
       )}
       <main className="container mx-auto p-4 md:p-6">
