@@ -23,16 +23,16 @@ const initialData = {
     { id: 2, name: 'Kiron' },
     { id: 3, name: 'Vets Pharma' },
   ],
-  users: [
-    { id: 1, username: 'superadmin', password: 'password', name: 'Admin General', role: 'Super Admin' },
-    { id: 2, username: 'admin', password: 'password', name: 'Administrador', role: 'Admin' },
-    { id: 3, username: 'gerente_kiron', password: 'password', name: 'Gerente Kiron', role: 'Gerente de laboratorio', laboratory: 'Kiron' },
-    { id: 4, username: 'gerente_petspharma', password: 'password', name: 'Gerente Pets Pharma', role: 'Gerente de laboratorio', laboratory: 'Pets Pharma' },
-    { id: 5, username: 'gerente_vetspharma', password: 'password', name: 'Gerente Vets Pharma', role: 'Gerente de laboratorio', laboratory: 'Vets Pharma' },
-    { id: 6, username: 'coordinador_ventas', password: 'password', name: 'Coordinador Ventas', role: 'Coordinador de vendedores' }, // Rol actualizado
-    { id: 7, username: 'vendedor_ana', password: 'password', name: 'Vendedor Ana', role: 'Vendedor' }, // Nuevo rol consolidado
-    { id: 8, username: 'vendedor_carlos', password: 'password', name: 'Vendedor Carlos', role: 'Vendedor' }, // Nuevo rol consolidado
-  ]
+ users: [
+    { id: 1, username: 'superadmin', password: 'password', name: 'Admin General', role: 'Super Admin' },
+    { id: 2, username: 'admin', password: 'password', name: 'Administrador', role: 'Admin' },
+    { id: 3, username: 'gerente_kiron', password: 'password', name: 'Gerente Kiron', role: 'Gerente de laboratorio', laboratory: 'Kiron' },
+    { id: 4, username: 'gerente_petspharma', password: 'password', name: 'Gerente Pets Pharma', role: 'Gerente de laboratorio', laboratory: 'Pets Pharma' },
+    { id: 5, username: 'gerente_vetspharma', password: 'password', name: 'Gerente Vets Pharma', role: 'Gerente de laboratorio', laboratory: 'Vets Pharma' },
+    { id: 6, username: 'coordinador_ventas', password: 'password', name: 'Coordinador Ventas', role: 'Coordinador de vendedores' }, // Rol actualizado
+    { id: 7, username: 'vendedor_ana', password: 'password', name: 'Vendedor Ana', role: 'Vendedor' }, // Nuevo rol consolidado
+    { id: 8, username: 'vendedor_carlos', password: 'password', name: 'Vendedor Carlos', role: 'Vendedor' }, // Nuevo rol consolidado
+]
 };
 
 // Productos iniciales, estructurados directamente por laboratorio usando los imports

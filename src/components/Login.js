@@ -1,38 +1,48 @@
 import React, { useState } from 'react';
 import { LogIn } from 'lucide-react';
 
-export default function Login({ onLogin }) {
+// Acepta 'users' como una prop del componente padre (App.js)
+export default function Login({ onLogin, users: allUsersFromProps }) { // Renombre la prop para evitar confusión
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(''); // Estado para manejar errores de login
 
-  // Usuarios hardcodeados con roles para simulación
-  const users = {
-    'superadmin': { password: 'password', role: 'Super Admin', name: 'Admin General' },
-    'admin': { password: 'password', role: 'Admin', name: 'Administrador' },
-    'gerente_kiron': { password: 'password', role: 'Gerente de laboratorio', name: 'Gerente Kiron', laboratory: 'Kiron' },
-    'gerente_petspharma': { password: 'password', role: 'Gerente de laboratorio', name: 'Gerente petspharma', laboratory: 'petspharma' },
-    'gerente_vetspharma': { password: 'password', role: 'Gerente de laboratorio', name: 'Gerente Vets Pharma', laboratory: 'Vets Pharma' },
-    'coordinador': { password: 'password', role: 'Coordinador', name: 'Coordinador Ventas' },
-    'representante1': { password: 'password', role: 'Representante/Promotor', name: 'Representante Ana' },
-    'distribuidor1': { password: 'password', role: 'Representante Distribuidor', name: 'Rep. Dist. Carlos' },
-  };
+  // Credenciales hardcodeadas INTERNAMENTE para las cuentas de prueba.
+  // Esto asegura que el login funcione con las cuentas mostradas,
+  // independientemente de lo que venga en 'allUsersFromProps'.
+  const internalTestUsers = [
+    { id: 1, username: 'superadmin', password: 'password', name: 'Admin General', role: 'Super Admin' },
+    { id: 2, username: 'admin', password: 'password', name: 'Administrador', role: 'Admin' },
+    { id: 3, username: 'gerente_kiron', password: 'password', name: 'Gerente Kiron', role: 'Gerente de laboratorio', laboratory: 'Kiron' },
+    { id: 4, username: 'gerente_petspharma', password: 'password', name: 'Gerente Pets Pharma', role: 'Gerente de laboratorio', laboratory: 'Pets Pharma' },
+    { id: 5, username: 'gerente_vetspharma', password: 'password', name: 'Gerente Vets Pharma', role: 'Gerente de laboratorio', laboratory: 'Vets Pharma' },
+    { id: 6, username: 'coordinador_ventas', password: 'password', name: 'Coordinador Ventas', role: 'Coordinador de vendedores' },
+    { id: 7, username: 'vendedor_ana', password: 'password', name: 'Vendedor Ana', role: 'Vendedor' },
+    { id: 8, username: 'vendedor_carlos', password: 'password', name: 'Vendedor Carlos', role: 'Vendedor' },
+  ];
+
+  // Crear un mapa para una búsqueda eficiente de los usuarios de prueba internos
+  const userMap = internalTestUsers.reduce((acc, user) => {
+    acc[user.username] = user;
+    return acc;
+  }, {});
 
   const handleSubmit = (e) => {
     e.preventDefault();
     setError(''); // Limpiar errores previos
 
-    const user = users[username];
+    const user = userMap[username]; // Buscar usuario en el mapa de usuarios internos
 
     if (user && user.password === password) {
-      onLogin({ username, role: user.role, name: user.name, laboratory: user.laboratory }); // Pasa el objeto de usuario completo
+      // Pasa el objeto de usuario completo para el login
+      onLogin({ username: user.username, role: user.role, name: user.name, laboratory: user.laboratory });
     } else {
       setError('Usuario o contraseña incorrectos.'); // Establecer mensaje de error
     }
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100"> {/* Añadido bg-gray-100 para un fondo más suave */}
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
       <div className="w-full max-w-sm p-8 space-y-8 bg-white rounded-xl shadow-lg">
         <div className="text-center">
           <img
@@ -79,16 +89,18 @@ export default function Login({ onLogin }) {
           </button>
         </form>
 
-        {/* Información de cuentas de prueba, adaptada al diseño existente */}
+        {/* Información de cuentas de prueba, ahora hardcodeada como texto estático */}
         <div className="mt-8 text-center text-sm text-gray-500 p-4 bg-gray-50 rounded-lg border border-gray-200">
           <p className="font-semibold text-gray-700 mb-2">Cuentas de prueba:</p>
           <ul className="list-disc list-inside text-left mx-auto max-w-xs">
             <li><span className="font-medium">Super Admin:</span> `superadmin` / `password`</li>
             <li><span className="font-medium">Admin:</span> `admin` / `password`</li>
-            <li><span className="font-medium">Gerentes Lab.:</span> `gerente_kiron`, `_petspharma`, `_vetspharma` / `password`</li>
-            <li><span className="font-medium">Coordinador:</span> `coordinador` / `password`</li>
-            <li><span className="font-medium">Representante:</span> `representante1` / `password`</li>
-            <li><span className="font-medium">Rep. Distrib.:</span> `distribuidor1` / `password`</li>
+            <li><span className="font-medium">Gerente de laboratorio Kiron:</span> `gerente_kiron` / `password`</li>
+            <li><span className="font-medium">Gerente de laboratorio Pets Pharma:</span> `gerente_petspharma` / `password`</li>
+            <li><span className="font-medium">Gerente de laboratorio Vets Pharma:</span> `gerente_vetspharma` / `password`</li>
+            <li><span className="font-medium">Coordinador de vendedores:</span> `coordinador_ventas` / `password`</li>
+            <li><span className="font-medium">Vendedor Ana:</span> `vendedor_ana` / `password`</li>
+            <li><span className="font-medium">Vendedor Carlos:</span> `vendedor_carlos` / `password`</li>
           </ul>
         </div>
       </div>
