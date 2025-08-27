@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingCart, User as UserIcon, Truck, DollarSign, Plus, Trash2, FlaskConical, Tag, Minus } from 'lucide-react';
+import { ShoppingCart, User as UserIcon, Truck, DollarSign, Plus, Trash2, FlaskConical } from 'lucide-react';
 
+// Componente individual para cada fila de producto
 const ProductRow = ({ item, index, onUpdate, onRemove, productList, laboratory, user, maxDiscountPercentage }) => {
-  const [showBonus, setShowBonus] = useState(false);
-
-  // Opciones de descuento dinámicas basadas en maxDiscountPercentage
+  // Opciones de descuento dinámicas basadas en el máximo permitido
+  // Se generan en incrementos de 5%
   const itemDiscountOptions = Array.from({ length: Math.floor(maxDiscountPercentage / 0.05) + 1 }, (_, i) => ({
     label: `${(i * 5)}%`,
     value: (i * 0.05)
@@ -12,10 +12,11 @@ const ProductRow = ({ item, index, onUpdate, onRemove, productList, laboratory, 
 
   // Calcula el subtotal, descuento y total para este ítem
   const quantity = parseFloat(item.quantity) || 0;
+  const bonus = parseFloat(item.bonus) || 0;
   const price = parseFloat(item.price) || 0;
   const discount = parseFloat(item.discount) || 0;
 
-  const rawItemSubtotal = quantity * price; // Subtotal sin descuento por ítem
+  const rawItemSubtotal = (quantity + bonus) * price; // Subtotal del ítem incluyendo bonus
   const itemDiscountAmount = rawItemSubtotal * discount; // Monto del descuento por ítem
   const itemFinalTotal = rawItemSubtotal - itemDiscountAmount; // Total final con descuento por ítem
 
@@ -26,8 +27,9 @@ const ProductRow = ({ item, index, onUpdate, onRemove, productList, laboratory, 
     if (product) {
       const selectedPrice = product.price; // Usar el precio del producto seleccionado
       const currentQuantity = parseFloat(item.quantity) || 1;
+      const currentBonus = parseFloat(item.bonus) || 0;
       const currentDiscount = parseFloat(item.discount) || 0;
-      const newTotal = (currentQuantity * selectedPrice * (1 - currentDiscount)).toFixed(2);
+      const newTotal = ((currentQuantity + currentBonus) * selectedPrice * (1 - currentDiscount)).toFixed(2);
       
       updatedItem = {
         ...item,
@@ -46,23 +48,16 @@ const ProductRow = ({ item, index, onUpdate, onRemove, productList, laboratory, 
   const handleInputChange = (field, value) => {
     const newItem = { ...item, [field]: value };
     const currentQuantity = parseFloat(newItem.quantity) || 0;
-    const currentPrice = parseFloat(newItem.price) || 0; // Se sigue usando item.price para cálculos
+    const currentBonus = parseFloat(newItem.bonus) || 0;
+    const currentPrice = parseFloat(newItem.price) || 0;
     const currentDiscount = parseFloat(newItem.discount) || 0;
     
-    const newTotal = (currentQuantity * currentPrice * (1 - currentDiscount)).toFixed(2);
+    const newTotal = ((currentQuantity + currentBonus) * currentPrice * (1 - currentDiscount)).toFixed(2);
     
     newItem.total = newTotal; // Actualiza el total del ítem con el descuento
     onUpdate(index, newItem);
   };
   
-  const toggleBonus = () => {
-    const newShowBonus = !showBonus;
-    setShowBonus(newShowBonus);
-    if (!newShowBonus) {
-      handleInputChange('bonus', 0);
-    }
-  };
-
   return (
     <div className="flex flex-col p-3 bg-gray-50 rounded-lg mb-4 shadow-sm border border-gray-200">
       <div className="grid grid-cols-1 md:grid-cols-12 gap-2 items-center">
@@ -104,26 +99,14 @@ const ProductRow = ({ item, index, onUpdate, onRemove, productList, laboratory, 
         {/* Bonus */}
         <div className="col-span-1 md:col-span-1">
           <label htmlFor={`bonus-${index}`} className="block text-gray-700 text-xs font-semibold mb-1">Bonus</label>
-          <div className="flex items-center">
-            <button onClick={toggleBonus} className="text-blue-600 hover:text-blue-800 p-1 rounded-full bg-blue-100 mr-1">
-              {showBonus ? <Minus size={16} /> : <Tag size={16} />}
-            </button>
-            {showBonus && (
-              <input
-                id={`bonus-${index}`}
-                type="number"
-                placeholder="Bonus"
-                value={item.bonus}
-                onChange={(e) => handleInputChange("bonus", e.target.value)}
-                className="w-full p-2 border rounded-md text-sm"
-              />
-            )}
-            {!showBonus && (
-              <span className="w-full p-2 border rounded-md bg-white text-sm text-gray-700">
-                {item.bonus || 0}
-              </span>
-            )}
-          </div>
+            <input
+              id={`bonus-${index}`}
+              type="number"
+              placeholder="Bonus"
+              value={item.bonus}
+              onChange={(e) => handleInputChange("bonus", e.target.value)}
+              className="w-full p-2 border rounded-md text-sm"
+            />
         </div>
         {/* Precio Unitario (ahora fijo, no editable para nadie) */}
         <div className="col-span-1 md:col-span-2">
@@ -173,7 +156,6 @@ const ProductRow = ({ item, index, onUpdate, onRemove, productList, laboratory, 
 };
 
 export default function OrderForm({ onSaveOrder, products, clients, representatives = [], distributors = [], laboratories = [], user }) {
-  // Estado inicial para el representante.
   const [representative, setRepresentative] = useState(user && user.role === 'Representante' ? user.name : "");
   const [client, setClient] = useState("");
   const [distributor, setDistributor] = useState(user && user.role === 'Representante' ? user.name : "");
@@ -189,19 +171,18 @@ export default function OrderForm({ onSaveOrder, products, clients, representati
   const [showModal, setShowModal] = useState(false);
   const [modalMessage, setModalMessage] = useState("");
 
-  // Filtrar productos por el laboratorio del gerente si aplica
   const productsByLaboratory = (user && user.role === 'Gerente de laboratorio') 
     ? (products[user.laboratory] || [])
     : (products[laboratory] || []);
 
-  // Calcular el máximo descuento permitido para el laboratorio seleccionado
   const getMaxDiscountPercentageForLab = () => {
-    if (laboratory === 'petspharma' || laboratory === 'Vets Pharma') {
-      return 0.65; // 65% para petspharma y Vets Pharma
-    } else if (laboratory === 'Kiron') {
-      return 0.30; // 30% para Kiron
+    // Lógica de descuento según el laboratorio
+    if (laboratory === 'Pets Pharma') { 
+      return 0.65; // Descuento de 65% para Pets Pharma
+    } else if (laboratory === 'Kiron' || laboratory === 'Vets Pharma') {
+      return 0.35; // Descuento de 35% para Kiron y Vets Pharma
     }
-    return 0; // Sin descuento por defecto
+    return 0; // Por defecto, no hay descuento
   };
 
   const maxDiscountAllowed = getMaxDiscountPercentageForLab();
@@ -212,11 +193,12 @@ export default function OrderForm({ onSaveOrder, products, clients, representati
 
     items.forEach(item => {
       const quantity = parseFloat(item.quantity) || 0;
+      const bonus = parseFloat(item.bonus) || 0;
       const price = parseFloat(item.price) || 0;
       const discount = parseFloat(item.discount) || 0;
 
-      currentRawSubtotal += (quantity * price);
-      currentTotalWithItemDiscounts += (quantity * price * (1 - discount));
+      currentRawSubtotal += ((quantity + bonus) * price);
+      currentTotalWithItemDiscounts += ((quantity + bonus) * price * (1 - discount));
     });
 
     setRawSubtotal(currentRawSubtotal);
@@ -225,7 +207,6 @@ export default function OrderForm({ onSaveOrder, products, clients, representati
 
   }, [items]);
 
-  // Efecto para resetear los items cuando el laboratorio cambia
   useEffect(() => {
     setItems([{ sku: "", productName: "", quantity: "1", bonus: "0", price: "0.00", discount: "0", total: "0.00" }]);
   }, [laboratory]);
@@ -318,7 +299,8 @@ export default function OrderForm({ onSaveOrder, products, clients, representati
                 value={representative} 
                 onChange={(e) => setRepresentative(e.target.value)} 
                 className="w-full bg-transparent focus:outline-none"
-                disabled={user && user.role === 'Representante'} 
+                // Modificación aquí: deshabilitar para Representante y Gerente de laboratorio
+                disabled={user && (user.role === 'Representante' || user.role === 'Gerente de laboratorio')} 
               >
                 <option value="">Selecciona Representante</option>
                 {representatives.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}

@@ -74,39 +74,42 @@ const generateSampleOrders = () => {
     const availableLabProducts = allProducts.filter(p => p.laboratory === laboratory);
 
     if (availableLabProducts.length === 0) {
-        console.warn(`No hay productos definidos para el laboratorio ${laboratory}. Saltando esta orden de ejemplo.`);
-        continue;
+      console.warn(`No hay productos definidos para el laboratorio ${laboratory}. Saltando esta orden de ejemplo.`);
+      continue;
     }
 
-    // Determinar el descuento máximo basado en el laboratorio
-    let maxDiscountForLab = 0.30; // Default 30% para Kiron
-    if (laboratory === 'Pets Pharma' || laboratory === 'Vets Pharma') {
-      maxDiscountForLab = 0.65; // 65% para Pets Pharma y Vets Pharma
+    // --- LÓGICA DE DESCUENTO ACTUALIZADA ---
+    // Ahora Vets Pharma tiene el mismo descuento de 30% que Kiron.
+    let maxDiscountForLab = 0; 
+    if (laboratory === 'Kiron' || laboratory === 'Vets Pharma') {
+      maxDiscountForLab = 0.30; 
+    } else if (laboratory === 'Pets Pharma') {
+      maxDiscountForLab = 0.65;
     }
 
     for (let j = 0; j < numItems; j++) {
-        const randomProduct = availableLabProducts[Math.floor(Math.random() * availableLabProducts.length)];
+      const randomProduct = availableLabProducts[Math.floor(Math.random() * availableLabProducts.length)];
 
-        const quantity = Math.floor(Math.random() * 5) + 1; // 1 a 5 unidades
-        const bonus = Math.floor(Math.random() * 2); // 0 o 1 bonus
-        const price = randomProduct.price;
+      const quantity = Math.floor(Math.random() * 5) + 1; // 1 a 5 unidades
+      const bonus = Math.floor(Math.random() * 2); // 0 o 1 bonus
+      const price = randomProduct.price;
 
-        // Generar un descuento aleatorio dentro del rango permitido para el laboratorio
-        const maxIncrements = Math.floor(maxDiscountForLab / 0.05); // Número de incrementos de 5%
-        const discount = (Math.floor(Math.random() * (maxIncrements + 1)) * 0.05); // Incluye 0%
+      // Generar un descuento aleatorio dentro del rango permitido para el laboratorio
+      const maxIncrements = Math.floor(maxDiscountForLab / 0.05); // Número de incrementos de 5%
+      const discount = (Math.floor(Math.random() * (maxIncrements + 1)) * 0.05); // Incluye 0%
 
-        const itemTotal = ((quantity + bonus) * price * (1 - discount));
+      const itemTotal = ((quantity + bonus) * price * (1 - discount));
 
-        orderItems.push({
-          sku: randomProduct.id, // Usar el ID del producto como SKU
-          productName: randomProduct.name,
-          quantity: quantity.toString(),
-          bonus: bonus.toString(),
-          price: price.toFixed(2),
-          discount: discount.toFixed(2),
-          total: itemTotal.toFixed(2),
-        });
-        currentOrderSubtotal += itemTotal;
+      orderItems.push({
+        sku: randomProduct.code, // Usar el código del producto como SKU
+        productName: randomProduct.name,
+        quantity: quantity.toString(),
+        bonus: bonus.toString(),
+        price: price.toFixed(2),
+        discount: discount.toFixed(2),
+        total: itemTotal.toFixed(2),
+      });
+      currentOrderSubtotal += itemTotal;
     }
 
     const finalSubtotal = parseFloat(currentOrderSubtotal.toFixed(2));
@@ -418,22 +421,22 @@ export default function App() {
       const laboratoryName = item.laboratory;
       setProducts(prevProducts => ({
         ...prevProducts,
-        [laboratoryName]: [...(prevProducts[laboratoryName] || []), { ...item, id: Date.now(), sku: item.id }] // Asegurarse de que el SKU se guarda con el ID
+        [laboratoryName]: [...(prevProducts[laboratoryName] || []), { ...item, id: Date.now() }]
       }));
     },
     handleUpdateItem: (updatedItem) => {
       const laboratoryName = updatedItem.laboratory;
       setProducts(prevProducts => ({
         ...prevProducts,
-        [laboratoryName]: prevProducts[laboratoryName].map(item => item.id === updatedItem.id ? { ...updatedItem, sku: updatedItem.id } : item) // Actualizar SKU también
+        [laboratoryName]: prevProducts[laboratoryName].map(item => item.code === updatedItem.code ? { ...updatedItem, id: item.id } : item)
       }));
     },
-    handleDeleteItem: (id, laboratoryName) => {
-      // Reemplazando window.confirm() por un mensaje en la consola
+    handleDeleteItem: (code, laboratoryName) => {
+      // La función ahora recibe 'code' en lugar de 'id'
       console.warn(`Confirmación de eliminación: ¿Estás seguro de que quieres eliminar este producto del laboratorio ${laboratoryName}?`);
       setProducts(prevProducts => ({
         ...prevProducts,
-        [laboratoryName]: prevProducts[laboratoryName].filter(item => item.id !== id)
+        [laboratoryName]: prevProducts[laboratoryName].filter(item => item.code !== code) // Filtramos por 'code' en lugar de 'id'
       }));
     },
   };
