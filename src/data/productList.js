@@ -165,7 +165,6 @@ export const petspharmaProducts = [
     { id: 49, code: "PET249", name: "AMOXIPET PLUS SUSPENSIÓN 15 ml", price: 219.00, laboratory: "Pets Pharma" },
     { id: 50, code: "PET259", name: "IVERKAN 10 EXHIBIDOR 15x2 tabs", price: 1100.00, laboratory: "Pets Pharma" },
     { id: 51, code: "PET260", name: "IVERKAN 30 EXHIBIDOR 15x2 tabs", price: 2700.00, laboratory: "Pets Pharma" },
-    { id: 52, code: "PET265", name: "DEXAFLAM 100 ml", price: 317.00, laboratory: "Pets Pharma" },
     { id: 53, code: "PET274", name: "ARTRO TABS c/30 tabs", price: 608.00, laboratory: "Pets Pharma" },
     { id: 54, code: "PET278", name: "AMOXIN 100 30 ml", price: 183.00, laboratory: "Pets Pharma" },
     { id: 55, code: "PET279", name: "AMOXIN 250 30 ml", price: 262.00, laboratory: "Pets Pharma" },
@@ -183,7 +182,6 @@ export const petspharmaProducts = [
     { id: 67, code: "PET443", name: "FRESH CARE BEBÉ 120 ml", price: 235.00, laboratory: "Pets Pharma" },
     { id: 68, code: "PET464", name: "EFA DERM LIQUID 125 ml", price: 352.00, laboratory: "Pets Pharma" },
     { id: 69, code: "PET465", name: "EFA DERM LIQUID 237 ml", price: 580.00, laboratory: "Pets Pharma" },
-    { id: 70, code: "PET473", name: "IVERKAN SB 10x2 tabs", price: 418.00, laboratory: "Pets Pharma" },
     { id: 71, code: "PET503", name: "BENZODERM SHAMPOO 350 ml", price: 345.00, laboratory: "Pets Pharma" },
     { id: 72, code: "PET504", name: "NEUTRADERM SHAMPOO 350 ml", price: 234.00, laboratory: "Pets Pharma" },
     { id: 73, code: "PET505", name: "DERMATRYL MEDICADO 350 ml", price: 314.00, laboratory: "Pets Pharma" },
@@ -220,7 +218,8 @@ export const petspharmaProducts = [
     { id: 104, code: "PET642", name: "CICATRYVET SPRAY 100 ml", price: 277.00, laboratory: "Pets Pharma" },
     { id: 105, code: "PET643", name: "GIARDIPET'S PLUS SUSPENSIÓN PERRO", price: 285.00, laboratory: "Pets Pharma" },
     { id: 106, code: "PET647", name: "BARBITHAL 100 ml", price: 2990.00, laboratory: "Pets Pharma" },
-    { id: 107, code: "PET651", name: "LACTY-PET CAT 300 g", price: 440.00, laboratory: "Pets Pharma" }
+    { id: 107, code: "PET651", name: "LACTY-PET CAT 300 g", price: 440.00, laboratory: "Pets Pharma" },
+
 ];
 
 export const vetsPharmaProducts = [

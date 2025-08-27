@@ -19,6 +19,7 @@ const Modal = ({ onClose, title, children }) => (
 export default function ProductManagement({ products, laboratories, handlers, user }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentProduct, setCurrentProduct] = useState(null);
+  const [isEditing, setIsEditing] = useState(false); // Nuevo estado para controlar si estamos editando
   const [selectedLaboratory, setSelectedLaboratory] = useState('');
   const [filterText, setFilterText] = useState('');
 
@@ -28,21 +29,20 @@ export default function ProductManagement({ products, laboratories, handlers, us
   const canEditProductPrice = user && ['Super Admin', 'Admin'].includes(user.role);
   const canDeleteProduct = user && ['Super Admin', 'Admin', 'Coordinador de vendedores'].includes(user.role);
 
+  // Unir todos los productos en un solo array para evitar duplicaciones
+  const allProducts = Object.values(products).flat();
+
   // Filtrar productos por el laboratorio seleccionado y texto de búsqueda
-  const filteredProducts = Object.values(products)
-    .flat()
-    .filter(product => {
+  const filteredProducts = allProducts.filter(product => {
       const productLaboratoryName = product.laboratory?.toLowerCase() || '';
       const filterLaboratoryName = selectedLaboratory?.toLowerCase() || '';
-      const filterLower = filterText.toLowerCase().trim(); // Elimina espacios en blanco para una coincidencia exacta
+      const filterLower = filterText.toLowerCase().trim();
 
       const matchesLaboratory = filterLaboratoryName === '' || productLaboratoryName === filterLaboratoryName;
       
-      // FIX: Ahora la lógica busca una coincidencia exacta de la palabra
-      // en el nombre del producto o en el SKU para eliminar resultados irrelevantes.
       const matchesFilterText = filterText === '' ||
-                                product.name?.toLowerCase() === filterLower ||
-                                String(product.code).toLowerCase() === filterLower;
+                                (product.name?.toLowerCase().split(' ').some(word => word.startsWith(filterLower))) ||
+                                (String(product.code).toLowerCase().startsWith(filterLower));
       
       return matchesLaboratory && matchesFilterText;
     })
@@ -53,15 +53,21 @@ export default function ProductManagement({ products, laboratories, handlers, us
       return true;
     });
 
-  // Abre el modal para agregar o editar un producto
-  const openModal = (product = null) => {
-    // Si el usuario es Gerente de laboratorio y no puede editar, muestra un error y no abre el modal
-    if (product && user && user.role === 'Gerente de laboratorio' && !canEditProductDetails) {
+  // Abre el modal para agregar un producto
+  const openAddModal = () => {
+    setCurrentProduct({ code: '', name: '', description: '', price: '0.00', laboratory: '' });
+    setIsEditing(false); // Establecer isEditing a false para agregar
+    setIsModalOpen(true);
+  };
+
+  // Abre el modal para editar un producto
+  const openEditModal = (product) => {
+    if (user && user.role === 'Gerente de laboratorio' && !canEditProductDetails) {
         console.error('Como Gerente de laboratorio, solo puedes agregar productos, no editar los existentes.');
         return;
     }
-    // Inicializa el producto actual para el modal, usando 'code' en lugar de 'id'
-    setCurrentProduct(product ? { ...product } : { code: '', name: '', description: '', price: '0.00', laboratory: '' });
+    setCurrentProduct(product);
+    setIsEditing(true); // Establecer isEditing a true para editar
     setIsModalOpen(true);
   };
 
@@ -79,14 +85,13 @@ export default function ProductManagement({ products, laboratories, handlers, us
       return;
     }
 
-    // Se usa 'currentProduct.code' para determinar si es una edición
-    if (currentProduct.code) { // Es una edición
+    if (isEditing && handlers.handleUpdateItem) {
       if (canEditProductDetails) {
         handlers.handleUpdateItem(currentProduct);
       } else {
         console.error('No tienes permiso para editar este producto.');
       }
-    } else { // Es un nuevo producto
+    } else if (!isEditing && handlers.handleAddItem) {
       if (canAddProduct) {
         handlers.handleAddItem(currentProduct);
       } else {
@@ -99,7 +104,12 @@ export default function ProductManagement({ products, laboratories, handlers, us
   // Maneja los cambios en los inputs del formulario
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setCurrentProduct(prev => ({ ...prev, [name]: value }));
+    // Check if the input name is 'code' and convert the value to uppercase
+    if (name === 'code') {
+      setCurrentProduct(prev => ({ ...prev, [name]: value.toUpperCase() }));
+    } else {
+      setCurrentProduct(prev => ({ ...prev, [name]: value }));
+    }
   };
 
   return (
@@ -109,7 +119,7 @@ export default function ProductManagement({ products, laboratories, handlers, us
           <Package className="mr-3 text-blue-500" /> Gestión de Productos
         </h2>
         {canAddProduct && (
-          <button onClick={() => openModal()} className="flex items-center bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700">
+          <button onClick={openAddModal} className="flex items-center bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700">
             <Plus size={20} className="mr-2" /> Agregar Producto
           </button>
         )}
@@ -169,7 +179,7 @@ export default function ProductManagement({ products, laboratories, handlers, us
                 <td className="py-3 px-4 text-right text-sm text-gray-800 space-x-2">
                   {canEditProductDetails && (
                     <button
-                      onClick={() => openModal(product)}
+                      onClick={() => openEditModal(product)}
                       className="text-blue-600 hover:text-blue-800 p-1.5 rounded-md hover:bg-blue-50 transition duration-150 ease-in-out"
                     >
                       <Edit size={18} />
@@ -197,8 +207,7 @@ export default function ProductManagement({ products, laboratories, handlers, us
       )}
 
       {isModalOpen && (
-        // Se usa 'currentProduct.code' en el título del modal
-        <Modal onClose={closeModal} title={currentProduct.code ? 'Editar Producto' : 'Agregar Producto'}>
+        <Modal onClose={closeModal} title={isEditing ? 'Editar Producto' : 'Agregar Producto'}>
           <form onSubmit={handleSave} className="space-y-4">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">Laboratorio</label>
@@ -208,7 +217,7 @@ export default function ProductManagement({ products, laboratories, handlers, us
                 onChange={handleChange}
                 className="w-full p-2.5 border border-gray-300 rounded-lg bg-white text-gray-800 focus:ring-blue-500 focus:border-blue-500"
                 required
-                disabled={user && user.role === 'Gerente de laboratorio' && !canEditProductDetails && currentProduct.code}
+                disabled={user && user.role === 'Gerente de laboratorio' && isEditing}
               >
                 <option value="">Selecciona Laboratorio</option>
                 {laboratories
@@ -227,8 +236,8 @@ export default function ProductManagement({ products, laboratories, handlers, us
                 onChange={handleChange}
                 className="w-full p-2.5 border border-gray-300 rounded-lg bg-white text-gray-800 focus:ring-blue-500 focus:border-blue-500"
                 required
-                // FIX: El campo SKU solo debe estar deshabilitado si currentProduct.code tiene un valor.
-                disabled={!!currentProduct.code}
+                // FIX: The SKU field is disabled only in editing mode.
+                disabled={isEditing}
               />
             </div>
             <div>
@@ -240,7 +249,7 @@ export default function ProductManagement({ products, laboratories, handlers, us
                 onChange={handleChange}
                 className="w-full p-2.5 border border-gray-300 rounded-lg bg-white text-gray-800 focus:ring-blue-500 focus:border-blue-500"
                 required
-                disabled={currentProduct.code && !canEditProductDetails && user.role === 'Gerente de laboratorio'}
+                disabled={isEditing && !canEditProductDetails && user.role === 'Gerente de laboratorio'}
               />
             </div>
             <div>
@@ -251,7 +260,7 @@ export default function ProductManagement({ products, laboratories, handlers, us
                 onChange={handleChange}
                 rows="3"
                 className="w-full p-2.5 border border-gray-300 rounded-lg bg-white text-gray-800 focus:ring-blue-500 focus:border-blue-500"
-                disabled={currentProduct.code && !canEditProductDetails && user.role === 'Gerente de laboratorio'}
+                disabled={isEditing && !canEditProductDetails && user.role === 'Gerente de laboratorio'}
               ></textarea>
             </div>
             <div>
@@ -269,8 +278,7 @@ export default function ProductManagement({ products, laboratories, handlers, us
             <div className="flex justify-end space-x-3 mt-6">
               <button type="button" onClick={closeModal} className="px-5 py-2.5 bg-gray-300 text-gray-800 font-semibold rounded-lg hover:bg-gray-400 transition duration-200 ease-in-out shadow-sm">Cancelar</button>
               <button type="submit" className="px-5 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition duration-200 ease-in-out shadow-md">
-                {currentProduct.code && canEditProductDetails ? 'Guardar Cambios' : 'Agregar Producto'}
-                {currentProduct.code && !canEditProductDetails && user.role === 'Gerente de laboratorio' && 'Cerrar'}
+                {isEditing ? 'Guardar Cambios' : 'Agregar Producto'}
               </button>
             </div>
           </form>
