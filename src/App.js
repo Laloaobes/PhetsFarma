@@ -15,7 +15,7 @@ import { petspharmaProducts, kironProducts, vetsPharmaProducts } from './data/pr
 // Datos de ejemplo para la aplicación
 const initialData = {
   // Los siguientes arrays se han vaciado para que se puedan agregar manualmente a través de la interfaz
-  sellers: [],
+  representatives: [], // <--- CAMBIO: Renombrado de 'sellers' a 'representatives'
   clients: [],
   distributors: [],
   laboratories: [
@@ -44,9 +44,9 @@ const initialProductsByLab = {
 
 // Función para generar 15 órdenes de ejemplo con diferentes fechas de agosto de 2025
 const generateSampleOrders = () => {
-  const sampleSellers = ['Vendedor Ana', 'Vendedor Carlos', 'Juan Pérez']; // Nombres de vendedores de ejemplo
+  const sampleRepresentatives = ['Vendedor Ana', 'Vendedor Carlos', 'Juan Pérez']; // <--- CAMBIO: Renombrado
   const sampleClients = ['Veterinaria Central', 'Pet Shop Feliz', 'Animalandia'];
-  const sampleDistributors = ['Distribuidora A', 'Distribuidora B', 'DistriVet']; // Los distribuidores no son roles de usuario directo aquí
+  const sampleDistributors = ['Distribuidora A', 'Distribuidora B', 'DistriVet'];
   const sampleLaboratories = ['Pets Pharma', 'Kiron', 'Vets Pharma'];
 
   const allProducts = [
@@ -58,19 +58,18 @@ const generateSampleOrders = () => {
   const orders = [];
   for (let i = 0; i < 15; i++) {
     const orderId = 1000 + i;
-    const day = (i % 31) + 1; // Días del 1 al 15 o más, para agosto
-    const date = new Date(2025, 7, day, 9 + (i % 10), (i * 5) % 60, 0).toISOString(); // Mes 7 es agosto (0-indexado)
+    const day = (i % 31) + 1;
+    const date = new Date(2025, 7, day, 9 + (i % 10), (i * 5) % 60, 0).toISOString();
 
-    const seller = sampleSellers[Math.floor(Math.random() * sampleSellers.length)];
+    const representative = sampleRepresentatives[Math.floor(Math.random() * sampleRepresentatives.length)]; // <--- CAMBIO: Usar 'representative'
     const client = sampleClients[Math.floor(Math.random() * sampleClients.length)];
     const distributor = sampleDistributors[Math.floor(Math.random() * sampleDistributors.length)];
     const laboratory = sampleLaboratories[Math.floor(Math.random() * sampleLaboratories.length)];
 
-    const numItems = Math.floor(Math.random() * 3) + 1; // 1 a 3 ítems por pedido
+    const numItems = Math.floor(Math.random() * 3) + 1;
     let orderItems = [];
     let currentOrderSubtotal = 0;
 
-    // Asegurarse de que los productos para el laboratorio seleccionado existan
     const availableLabProducts = allProducts.filter(p => p.laboratory === laboratory);
 
     if (availableLabProducts.length === 0) {
@@ -78,8 +77,6 @@ const generateSampleOrders = () => {
       continue;
     }
 
-    // --- LÓGICA DE DESCUENTO ACTUALIZADA ---
-    // Ahora Vets Pharma tiene el mismo descuento de 30% que Kiron.
     let maxDiscountForLab = 0; 
     if (laboratory === 'Kiron' || laboratory === 'Vets Pharma') {
       maxDiscountForLab = 0.30; 
@@ -90,18 +87,17 @@ const generateSampleOrders = () => {
     for (let j = 0; j < numItems; j++) {
       const randomProduct = availableLabProducts[Math.floor(Math.random() * availableLabProducts.length)];
 
-      const quantity = Math.floor(Math.random() * 5) + 1; // 1 a 5 unidades
-      const bonus = Math.floor(Math.random() * 2); // 0 o 1 bonus
+      const quantity = Math.floor(Math.random() * 5) + 1;
+      const bonus = Math.floor(Math.random() * 2);
       const price = randomProduct.price;
 
-      // Generar un descuento aleatorio dentro del rango permitido para el laboratorio
-      const maxIncrements = Math.floor(maxDiscountForLab / 0.05); // Número de incrementos de 5%
-      const discount = (Math.floor(Math.random() * (maxIncrements + 1)) * 0.05); // Incluye 0%
+      const maxIncrements = Math.floor(maxDiscountForLab / 0.05);
+      const discount = (Math.floor(Math.random() * (maxIncrements + 1)) * 0.05);
 
       const itemTotal = ((quantity + bonus) * price * (1 - discount));
 
       orderItems.push({
-        sku: randomProduct.code, // Usar el código del producto como SKU
+        sku: randomProduct.code,
         productName: randomProduct.name,
         quantity: quantity.toString(),
         bonus: bonus.toString(),
@@ -119,7 +115,7 @@ const generateSampleOrders = () => {
     orders.push({
       id: orderId,
       date,
-      seller,
+      representative, // <--- CAMBIO: Usar 'representative' en lugar de 'seller'
       client,
       distributor,
       laboratory,
@@ -133,12 +129,10 @@ const generateSampleOrders = () => {
   return orders;
 };
 
-// Órdenes iniciales de ejemplo generadas
 const initialOrders = generateSampleOrders();
 
-
 export default function App() {
-  const [user, setUser] = useState(null); // Objeto de usuario con rol
+  const [user, setUser] = useState(null);
   const [currentView, setCurrentView] = useState('login');
   const [lastView, setLastView] = useState('login');
   const [orders, setOrders] = useState(initialOrders);
@@ -147,7 +141,6 @@ export default function App() {
   const [promotions, setPromotions] = useState({});
   const [currentOrder, setCurrentOrder] = useState(null);
 
-  // Efecto para cargar el usuario desde localStorage al iniciar la app
   useEffect(() => {
     const savedUser = localStorage.getItem("salesUser");
     if (savedUser) {
@@ -156,14 +149,12 @@ export default function App() {
     }
   }, []);
 
-  // Función para manejar el login
   const handleLogin = (loggedInUser) => {
     setUser(loggedInUser);
     localStorage.setItem("salesUser", JSON.stringify(loggedInUser));
     setCurrentView("orderForm");
   };
 
-  // Función para manejar el logout
   const handleLogout = () => {
     setUser(null);
     localStorage.removeItem("salesUser");
@@ -182,135 +173,129 @@ export default function App() {
     handleNavigate('orderSummary', newOrder);
   };
 
-  // Función de impresión con estilo EXACTO de la imagen proporcionada
   const handlePrint = (order) => {
     if (!order) {
       console.error("No hay orden para imprimir.");
       return;
     }
 
-    // Estilos CSS replicando la imagen proporcionada
     const printStyles = `
       @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
       body {
         font-family: 'Inter', sans-serif;
         margin: 0;
         padding: 0;
-        background-color: #f3f4f6; /* Fondo gris claro */
+        background-color: #f3f4f6;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
       }
       .print-page-container {
-        max-width: 800px; /* Ancho ajustado para la imagen */
-        margin: 40px auto; /* Centrado vertical y horizontal */
-        padding: 32px; /* p-8 */
+        max-width: 800px;
+        margin: 40px auto;
+        padding: 32px;
         background-color: #ffffff;
         border-radius: 8px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06); /* Sombra suave */
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
       }
       h1 {
-        font-size: 1.5rem; /* text-2xl */
-        font-weight: 700; /* font-bold */
-        color: #1f2937; /* text-gray-800 */
-        margin-bottom: 24px; /* mb-6 */
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #1f2937;
+        margin-bottom: 24px;
         display: flex;
         align-items: center;
         justify-content: flex-start;
       }
-      .icon { margin-right: 12px; color: #6b7280; font-size: 1.5rem; } /* Icono del printer */
+      .icon { margin-right: 12px; color: #6b7280; font-size: 1.5rem; }
 
       .info-grid {
         display: grid;
-        grid-template-columns: 1.5fr 1.5fr 1fr; /* 3 columnas: Cliente/Lab/ID, Vendedor/Fecha, Distribuidor/Hora */
-        gap: 8px 24px; /* gap-y-2 gap-x-6 */
-        margin-bottom: 24px; /* mb-6 */
-        font-size: 0.875rem; /* text-sm */
-        color: #4b5563; /* text-gray-600 */
+        grid-template-columns: 1.5fr 1.5fr 1fr;
+        gap: 8px 24px;
+        margin-bottom: 24px;
+        font-size: 0.875rem;
+        color: #4b5563;
       }
-      .info-grid div strong { color: #1f2937; margin-right: 5px; } /* text-gray-800 */
-      .info-grid div { line-height: 1.4; } /* Espaciado de línea */
+      .info-grid div strong { color: #1f2937; margin-right: 5px; }
+      .info-grid div { line-height: 1.4; }
 
       .products-table-section {
-        /* No border-top o border-bottom general para la sección, se manejarán en rows */
         padding-top: 0;
         padding-bottom: 0;
-        margin-top: 24px; /* Espacio entre info y productos */
-        margin-bottom: 24px; /* Espacio antes del total */
+        margin-top: 24px;
+        margin-bottom: 24px;
       }
       
       .products-table-header-print, .products-table-row-print {
         display: grid;
-        /* Columnas basadas en la imagen: Producto (ancho), Cant (pequeño), P. Unit (mediano), Desc (%) (pequeño), Total (mediano) */
-        grid-template-columns: 3.5fr 1fr 1.5fr 1fr 2fr; /* Ajustado para 5 columnas visibles */
-        gap: 16px; /* gap-x-4 */
-        padding: 8px 0; /* Padding vertical para filas */
-        border-bottom: 1px solid #e5e7eb; /* Separador de fila */
+        grid-template-columns: 3.5fr 1fr 1.5fr 1fr 2fr;
+        gap: 16px;
+        padding: 8px 0;
+        border-bottom: 1px solid #e5e7eb;
       }
       .products-table-header-print {
-        font-weight: 600; /* font-semibold */
-        color: #374151; /* text-gray-700 */
-        border-top: 1px solid #e5e7eb; /* Borde superior para la cabecera */
+        font-weight: 600;
+        color: #374151;
+        border-top: 1px solid #e5e7eb;
       }
       .products-table-row-print {
-        color: #4b5563; /* text-gray-600 */
-        font-size: 0.9rem; /* Tamaño ligeramente más grande para las filas */
+        color: #4b5563;
+        font-size: 0.9rem;
       }
       .products-table-row-print:last-child {
-        border-bottom: none; /* No border for the last product item */
+        border-bottom: none;
       }
 
-      /* Alineación de texto en la tabla de productos */
-      .products-table-header-print div:nth-child(1), /* Producto */
-      .products-table-row-print div:nth-child(1) { /* Producto */
+      .products-table-header-print div:nth-child(1),
+      .products-table-row-print div:nth-child(1) {
         text-align: left;
       }
-      .products-table-header-print div:nth-child(2), /* Cant. */
-      .products-table-row-print div:nth-child(2) { /* Cant. */
-        text-align: center; /* Cantidad centrada */
+      .products-table-header-print div:nth-child(2),
+      .products-table-row-print div:nth-child(2) {
+        text-align: center;
       }
-      .products-table-header-print div:nth-child(3), /* P. Unit. */
-      .products-table-header-print div:nth-child(4), /* Desc. (%) */
-      .products-table-header-print div:nth-child(5), /* Total */
-      .products-table-row-print div:nth-child(3), /* P. Unit. */
-      .products-table-row-print div:nth-child(4), /* Desc. (%) */
-      .products-table-row-print div:nth-child(5) { /* Total */
+      .products-table-header-print div:nth-child(3),
+      .products-table-header-print div:nth-child(4),
+      .products-table-header-print div:nth-child(5),
+      .products-table-row-print div:nth-child(3),
+      .products-table-row-print div:nth-child(4),
+      .products-table-row-print div:nth-child(5) {
         text-align: right;
       }
 
       .totals-section {
         display: flex;
         flex-direction: column;
-        align-items: flex-end; /* Alineado a la derecha */
-        margin-top: 24px; /* mt-6 */
-        gap: 0; /* No hay espacio entre las filas de totales */
+        align-items: flex-end;
+        margin-top: 24px;
+        gap: 0;
       }
       .total-row {
         display: flex;
         justify-content: space-between;
         width: 100%;
-        max-width: 300px; /* Ancho fijo para la sección de totales */
-        padding: 4px 0; /* Espaciado para la fila del total */
+        max-width: 300px;
+        padding: 4px 0;
       }
       .total-row .total-label {
-        font-size: 1.8rem; /* text-3xl */
-        font-weight: 700; /* font-bold */
-        color: #1f2937; /* text-gray-800 */
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: #1f2937;
       }
       .total-row .total-value {
-        font-size: 1.8rem; /* text-3xl */
-        font-weight: 700; /* font-bold */
-        color: #1f2937; /* text-gray-800 */
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: #1f2937;
       }
 
       .footer-text {
         text-align: center;
-        font-size: 0.75rem; /* text-xs */
-        color: #9ca3af; /* text-gray-400 */
-        margin-top: 32px; /* mt-8 */
+        font-size: 0.75rem;
+        color: #9ca3af;
+        margin-top: 32px;
       }
     `;
 
-    // Encabezados de la tabla de productos
     const productsTableHeaderHtml = `
       <div class="products-table-header-print">
         <div>Producto</div>
@@ -321,7 +306,6 @@ export default function App() {
       </div>
     `;
 
-    // Generación de filas de productos
     let productsHtml = order.items.map((item) => {
       const itemPriceFormatted = parseFloat(item.price).toFixed(2);
       const itemDiscountPercentage = (parseFloat(item.discount) * 100).toFixed(0);
@@ -345,7 +329,7 @@ export default function App() {
         </h1>
         <div class="info-grid">
           <div><strong>Cliente:</strong> ${order.client || 'N/A'}</div>
-          <div><strong>Vendedor:</strong> ${order.seller || 'N/A'}</div>
+          <div><strong>Vendedor:</strong> ${order.representative || 'N/A'}</div> <!-- CAMBIO: Usar order.representative -->
           <div><strong>Distribuidor:</strong> ${order.distributor || 'N/A'}</div>
           <div><strong>Laboratorio:</strong> ${order.laboratory || 'N/A'}</div>
           <div><strong>Fecha:</strong> ${new Date(order.date).toLocaleDateString()}</div>
@@ -379,7 +363,6 @@ export default function App() {
       printWindow.focus();
       printWindow.print();
     } else {
-      // Reemplazando alert() por un mensaje en la consola
       console.error("No se pudo abrir la ventana de impresión. Por favor, asegúrese de que las ventanas emergentes estén permitidas.");
     }
   };
@@ -398,7 +381,6 @@ export default function App() {
       }));
     },
     handleDeleteItem: (id) => {
-      // Reemplazando window.confirm() por un mensaje en la consola para confirmar
       if (key !== 'users') {
         console.warn(`Confirmación de eliminación: ¿Estás seguro de que quieres eliminar este ${key.slice(0, -1)}?`);
         setData(prevData => ({
@@ -406,7 +388,6 @@ export default function App() {
           [key]: prevData[key].filter(item => item.id !== id)
         }));
       } else if (key === 'users') {
-        // La lógica de confirmación para usuarios se maneja dentro de UserManagement.js
         setData(prevData => ({
           ...prevData,
           [key]: prevData[key].filter(item => item.id !== id)
@@ -415,7 +396,6 @@ export default function App() {
     },
   });
 
-  // Handlers específicos para productos
   const productHandlers = {
     handleAddItem: (item) => {
       const laboratoryName = item.laboratory;
@@ -432,11 +412,10 @@ export default function App() {
       }));
     },
     handleDeleteItem: (code, laboratoryName) => {
-      // La función ahora recibe 'code' en lugar de 'id'
       console.warn(`Confirmación de eliminación: ¿Estás seguro de que quieres eliminar este producto del laboratorio ${laboratoryName}?`);
       setProducts(prevProducts => ({
         ...prevProducts,
-        [laboratoryName]: prevProducts[laboratoryName].filter(item => item.code !== code) // Filtramos por 'code' en lugar de 'id'
+        [laboratoryName]: prevProducts[laboratoryName].filter(item => item.code !== code)
       }));
     },
   };
@@ -453,10 +432,11 @@ export default function App() {
             onSaveOrder={handleSaveOrder}
             products={products}
             clients={data.clients}
-            sellers={data.sellers}
+            representatives={data.representatives} // <--- CAMBIO: Pasar 'representatives'
             distributors={data.distributors}
             laboratories={data.laboratories}
-            user={user} // Pasar el usuario
+            user={user}
+            onSaveNewClient={genericHandlers('clients').handleAddItem} // <--- NUEVO: Prop para guardar nuevos clientes
           />
         );
       case 'orderSummary':
@@ -466,7 +446,7 @@ export default function App() {
             onNavigate={handleNavigate}
             previousView={lastView}
             onPrint={handlePrint}
-            user={user} // Pasar el usuario
+            user={user}
           />
         );
       case 'reports':
@@ -474,11 +454,11 @@ export default function App() {
           <Reports
             orders={orders}
             onNavigate={handleNavigate}
-            sellers={data.sellers}
+            sellers={data.representatives} // <--- CAMBIO: Usar 'representatives' para reportes
             distributors={data.distributors}
             laboratories={data.laboratories}
             products={products}
-            user={user} // Pasar el usuario
+            user={user}
           />
         );
       case 'manageClients':
@@ -487,25 +467,25 @@ export default function App() {
             items={data.clients}
             handlers={genericHandlers('clients')}
             itemName="Cliente"
-            user={user} // Pasar el usuario
+            user={user}
           />
         );
-      case 'manageSellers': // Ahora gestionará a los Vendedores
+      case 'manageSellers':
         return (
           <GenericManagement
-            items={data.sellers}
-            handlers={genericHandlers('sellers')}
-            itemName="Representante/Promotor" // Nombre actualizado
-            user={user} // Pasar el usuario
+            items={data.representatives} // <--- CAMBIO: Usar 'representatives'
+            handlers={genericHandlers('representatives')} // <--- CAMBIO: Usar 'representatives'
+            itemName="Representante/Promotor"
+            user={user}
           />
         );
-      case 'manageDistributors': // Los distribuidores se gestionan por separado si no son usuarios
+      case 'manageDistributors':
         return (
           <GenericManagement
             items={data.distributors}
             handlers={genericHandlers('distributors')}
             itemName="Distribuidor"
-            user={user} // Pasar el usuario
+            user={user}
           />
         );
       case 'manageLaboratories':
@@ -514,7 +494,7 @@ export default function App() {
             items={data.laboratories}
             handlers={genericHandlers('laboratories')}
             itemName="Laboratorio"
-            user={user} // Pasar el usuario (fundamental para el permiso)
+            user={user}
           />
         );
       case 'manageProducts':
@@ -523,7 +503,7 @@ export default function App() {
             products={products}
             laboratories={data.laboratories}
             handlers={productHandlers}
-            user={user} // Pasar el usuario
+            user={user}
           />
         );
       case 'manageUsers':
@@ -556,7 +536,7 @@ export default function App() {
           onNavigate={handleNavigate}
           onLogout={handleLogout}
           currentView={currentView}
-          user={user} // Pasar el usuario al AdminPanel
+          user={user}
         />
       )}
       <main className="container mx-auto p-4 md:p-6">

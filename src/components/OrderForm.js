@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingCart, User as UserIcon, Truck, DollarSign, Plus, Trash2, FlaskConical } from 'lucide-react';
+import { ShoppingCart, User as UserIcon, Truck, DollarSign, Plus, Trash2, FlaskConical, Check, X } from 'lucide-react';
 
 // Componente individual para cada fila de producto
 const ProductRow = ({ item, index, onUpdate, onRemove, productList, laboratory, user, maxDiscountPercentage }) => {
   // Opciones de descuento dinámicas basadas en el máximo permitido
-  // Se generan en incrementos de 5%
   const itemDiscountOptions = Array.from({ length: Math.floor(maxDiscountPercentage / 0.05) + 1 }, (_, i) => ({
     label: `${(i * 5)}%`,
     value: (i * 0.05)
@@ -16,30 +15,31 @@ const ProductRow = ({ item, index, onUpdate, onRemove, productList, laboratory, 
   const price = parseFloat(item.price) || 0;
   const discount = parseFloat(item.discount) || 0;
 
-  const rawItemSubtotal = (quantity + bonus) * price; // Subtotal del ítem incluyendo bonus
-  const itemDiscountAmount = rawItemSubtotal * discount; // Monto del descuento por ítem
-  const itemFinalTotal = rawItemSubtotal - itemDiscountAmount; // Total final con descuento por ítem
+  // CAMBIO CLAVE AQUÍ: rawItemSubtotal ya no incluye 'bonus'
+  const rawItemSubtotal = quantity * price; // Las bonificaciones no se cobran
+  const itemDiscountAmount = rawItemSubtotal * discount;
+  const itemFinalTotal = rawItemSubtotal - itemDiscountAmount; // itemFinalTotal se basa en el rawItemSubtotal sin bonus
 
   const handleProductSelect = (productName) => {
     const product = productList.find((p) => p.name === productName);
     let updatedItem;
 
     if (product) {
-      const selectedPrice = product.price; // Usar el precio del producto seleccionado
+      const selectedPrice = product.price;
       const currentQuantity = parseFloat(item.quantity) || 1;
-      const currentBonus = parseFloat(item.bonus) || 0;
+      const currentBonus = parseFloat(item.bonus) || 0; // Se mantiene el bonus para mostrar la cantidad total de ítems
       const currentDiscount = parseFloat(item.discount) || 0;
-      const newTotal = ((currentQuantity + currentBonus) * selectedPrice * (1 - currentDiscount)).toFixed(2);
+      // CAMBIO CLAVE AQUÍ: newTotal no incluye 'bonus' en el cálculo monetario
+      const newTotal = (currentQuantity * selectedPrice * (1 - currentDiscount)).toFixed(2);
       
       updatedItem = {
         ...item,
-        sku: product.code, // Asignar el código del producto como SKU
+        sku: product.code,
         productName: product.name,
         price: selectedPrice.toFixed(2),
-        total: newTotal, // Asegúrate de que item.total se actualice correctamente
+        total: newTotal,
       };
     } else {
-      // Si no se selecciona un producto o se deselecciona, resetear
       updatedItem = { ...item, sku: "", productName: "", price: "0.00", total: "0.00" };
     }
     onUpdate(index, updatedItem);
@@ -52,9 +52,10 @@ const ProductRow = ({ item, index, onUpdate, onRemove, productList, laboratory, 
     const currentPrice = parseFloat(newItem.price) || 0;
     const currentDiscount = parseFloat(newItem.discount) || 0;
     
-    const newTotal = ((currentQuantity + currentBonus) * currentPrice * (1 - currentDiscount)).toFixed(2);
+    // CAMBIO CLAVE AQUÍ: newTotal no incluye 'bonus' en el cálculo monetario
+    const newTotal = (currentQuantity * currentPrice * (1 - currentDiscount)).toFixed(2);
     
-    newItem.total = newTotal; // Actualiza el total del ítem con el descuento
+    newItem.total = newTotal;
     onUpdate(index, newItem);
   };
   
@@ -113,7 +114,6 @@ const ProductRow = ({ item, index, onUpdate, onRemove, productList, laboratory, 
           <label htmlFor={`price-${index}`} className="block text-gray-700 text-xs font-semibold mb-1">Precio Unit.</label>
           <div className="flex items-center">
             <span className="text-gray-500 mr-1 text-sm">$</span>
-            {/* Siempre se muestra como span, no como input */}
             <span className="font-medium text-gray-800 p-2 bg-white border rounded-md w-full text-sm">
               {parseFloat(item.price).toFixed(2)}
             </span>
@@ -137,10 +137,10 @@ const ProductRow = ({ item, index, onUpdate, onRemove, productList, laboratory, 
         </div>
         {/* Totales individuales por producto (más concisos) */}
         <div className="col-span-1 md:col-span-2 flex flex-col items-end text-right">
-          {itemDiscountAmount > 0 ? ( // Solo muestra subtotal si hay descuento
+          {itemDiscountAmount > 0 ? (
             <span className="text-xs text-gray-600">Subt: ${rawItemSubtotal.toFixed(2)}</span>
           ) : (
-            <span className="text-xs text-gray-600">&nbsp;</span> // Espacio para mantener la alineación si no hay subtot
+            <span className="text-xs text-gray-600">&nbsp;</span>
           )}
           <span className="font-bold text-gray-800 text-sm">Total: ${itemFinalTotal.toFixed(2) || "0.00"}</span>
         </div>
@@ -155,10 +155,14 @@ const ProductRow = ({ item, index, onUpdate, onRemove, productList, laboratory, 
   );
 };
 
-export default function OrderForm({ onSaveOrder, products, clients, representatives = [], distributors = [], laboratories = [], user }) {
+export default function OrderForm({ onSaveOrder, products, clients, representatives = [], distributors = [], laboratories = [], user, onSaveNewClient }) {
   const [representative, setRepresentative] = useState(user && user.role === 'Representante' ? user.name : "");
   const [client, setClient] = useState("");
   const [distributor, setDistributor] = useState(user && user.role === 'Representante' ? user.name : "");
+  const [newClientName, setNewClientName] = useState("");
+  const [isAddingNewClient, setIsAddingNewClient] = useState(false);
+  // Nuevo estado para almacenar el nombre del cliente a seleccionar después de agregarlo
+  const [clientToSelectAfterAdd, setClientToSelectAfterAdd] = useState(null);
 
   const [laboratory, setLaboratory] = useState(user && user.role === 'Gerente de laboratorio' ? user.laboratory : "");
 
@@ -176,13 +180,12 @@ export default function OrderForm({ onSaveOrder, products, clients, representati
     : (products[laboratory] || []);
 
   const getMaxDiscountPercentageForLab = () => {
-    // Lógica de descuento según el laboratorio
     if (laboratory === 'Pets Pharma') { 
-      return 0.65; // Descuento de 65% para Pets Pharma
+      return 0.65;
     } else if (laboratory === 'Kiron' || laboratory === 'Vets Pharma') {
-      return 0.35; // Descuento de 35% para Kiron y Vets Pharma
+      return 0.35;
     }
-    return 0; // Por defecto, no hay descuento
+    return 0;
   };
 
   const maxDiscountAllowed = getMaxDiscountPercentageForLab();
@@ -193,12 +196,12 @@ export default function OrderForm({ onSaveOrder, products, clients, representati
 
     items.forEach(item => {
       const quantity = parseFloat(item.quantity) || 0;
-      const bonus = parseFloat(item.bonus) || 0;
+      // CAMBIO CLAVE AQUÍ: currentRawSubtotal ya no incluye 'bonus'
       const price = parseFloat(item.price) || 0;
       const discount = parseFloat(item.discount) || 0;
 
-      currentRawSubtotal += ((quantity + bonus) * price);
-      currentTotalWithItemDiscounts += ((quantity + bonus) * price * (1 - discount));
+      currentRawSubtotal += (quantity * price); // Las bonificaciones no se cobran
+      currentTotalWithItemDiscounts += (quantity * price * (1 - discount)); // Se mantiene el cálculo de descuento basado solo en la cantidad pagada
     });
 
     setRawSubtotal(currentRawSubtotal);
@@ -210,6 +213,14 @@ export default function OrderForm({ onSaveOrder, products, clients, representati
   useEffect(() => {
     setItems([{ sku: "", productName: "", quantity: "1", bonus: "0", price: "0.00", discount: "0", total: "0.00" }]);
   }, [laboratory]);
+
+  // Efecto para auto-seleccionar el cliente después de que la lista 'clients' se actualice
+  useEffect(() => {
+    if (clientToSelectAfterAdd && clients.some(c => c.name === clientToSelectAfterAdd)) {
+      setClient(clientToSelectAfterAdd); // Establece el cliente recién agregado como el seleccionado
+      setClientToSelectAfterAdd(null); // Limpia el estado temporal
+    }
+  }, [clients, clientToSelectAfterAdd]);
 
 
   const handleUpdateItem = (index, updatedItem) => {
@@ -231,9 +242,42 @@ export default function OrderForm({ onSaveOrder, products, clients, representati
     const newItems = items.filter((_, i) => i !== index);
     setItems(newItems);
   };
+
+  // Función para alternar entre el selector de cliente existente y el campo de nuevo cliente
+  const handleToggleNewClient = () => {
+    setIsAddingNewClient(prev => !prev);
+    setClient(""); // Limpiar el cliente seleccionado al alternar
+    setNewClientName(""); // Limpiar el nombre del nuevo cliente al alternar
+    setClientToSelectAfterAdd(null); // Limpiar cualquier cliente pendiente de selección
+  };
+
+  // Función para confirmar la adición de un nuevo cliente
+  const handleConfirmAddClient = () => {
+    if (newClientName.trim()) {
+      onSaveNewClient({ name: newClientName }); // Llama a la prop de App.js para guardar el nuevo cliente
+      setClientToSelectAfterAdd(newClientName); // Guarda el nombre para la auto-selección
+      setNewClientName(''); // Limpia el campo de entrada
+      setIsAddingNewClient(false); // Regresa al modo de selección
+    } else {
+      console.warn('El nombre del nuevo cliente no puede estar vacío.');
+    }
+  };
+
+  // Función para cancelar la adición de un nuevo cliente
+  const handleCancelAddClient = () => {
+    setNewClientName('');
+    setIsAddingNewClient(false); // Desactiva el modo de añadir nuevo cliente, regresando al selector
+    setClientToSelectAfterAdd(null); // Limpiar cualquier cliente pendiente de selección
+  };
   
   const handleSubmit = () => {
-    if (!client || !laboratory || items.some((i) => !i.productName || !i.price || parseFloat(i.price) <= 0)) {
+    let currentClient = "";
+
+    // Si está en modo de añadir nuevo cliente, el valor ya debería estar en 'client'
+    // si se confirmó. Si no, debería ser el 'client' ya seleccionado del dropdown.
+    currentClient = client;
+    
+    if (!currentClient || !laboratory || items.some((i) => !i.productName || !i.price || parseFloat(i.price) <= 0)) {
       setModalMessage("Por favor, completa el laboratorio, cliente y asegúrate de que todos los productos tengan nombre y precio válido.");
       setShowModal(true);
       return;
@@ -242,7 +286,7 @@ export default function OrderForm({ onSaveOrder, products, clients, representati
       id: Date.now(),
       date: new Date().toISOString(),
       representative,
-      client,
+      client: currentClient,
       distributor,
       laboratory,
       items,
@@ -299,7 +343,6 @@ export default function OrderForm({ onSaveOrder, products, clients, representati
                 value={representative} 
                 onChange={(e) => setRepresentative(e.target.value)} 
                 className="w-full bg-transparent focus:outline-none"
-                // Modificación aquí: deshabilitar para Representante y Gerente de laboratorio
                 disabled={user && (user.role === 'Representante' || user.role === 'Gerente de laboratorio')} 
               >
                 <option value="">Selecciona Representante</option>
@@ -328,17 +371,66 @@ export default function OrderForm({ onSaveOrder, products, clients, representati
           <div className="flex flex-col bg-gray-100 p-3 rounded-lg">
             <label htmlFor="client-select" className="block text-gray-700 text-xs font-semibold mb-1">Cliente *</label>
             <div className="flex items-center">
-              <UserIcon className="text-gray-500 mr-3" />
-              <select 
-                id="client-select"
-                value={client} 
-                onChange={(e) => setClient(e.target.value)} 
-                className="w-full bg-transparent focus:outline-none" 
-                required
-              >
-                <option value="">Selecciona Cliente</option>
-                {clients.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-              </select>
+              <UserIcon className="text-gray-500 mr-3" size={18} />
+              {isAddingNewClient ? (
+                <>
+                  <input
+                    type="text"
+                    value={newClientName}
+                    onChange={(e) => setNewClientName(e.target.value)}
+                    placeholder="Nombre del nuevo cliente"
+                    className="w-full bg-transparent focus:outline-none text-sm text-gray-800"
+                    required
+                  />
+                  {newClientName.trim() ? ( // Muestra los botones de Confirmar/Cancelar si hay texto
+                    <div className="flex space-x-2 ml-2">
+                      <button
+                        onClick={handleConfirmAddClient}
+                        className="p-1.5 rounded-full bg-green-100 text-green-600 hover:bg-green-200 focus:outline-none transition-colors shadow-sm"
+                        title="Confirmar"
+                      >
+                        <UserIcon size={20} /> {/* UserIcon ahora es el botón de Confirmar */}
+                      </button>
+                      <button
+                        onClick={handleCancelAddClient}
+                        className="p-1.5 rounded-full bg-red-100 text-red-600 hover:bg-red-200 focus:outline-none transition-colors shadow-sm"
+                        title="Cancelar"
+                      >
+                        <X size={20} />
+                      </button>
+                    </div>
+                  ) : ( // Si el input está vacío, solo muestra la X para cancelar y volver al selector
+                    <button
+                      onClick={handleCancelAddClient}
+                      className="ml-2 p-1.5 rounded-full bg-red-100 text-red-600 hover:bg-red-200 focus:outline-none transition-colors shadow-sm"
+                      title="Cancelar y volver a seleccionar cliente"
+                    >
+                      <X size={20} />
+                    </button>
+                  )}
+                </>
+              ) : (
+                <>
+                  <select
+                    id="client-select"
+                    value={client}
+                    onChange={(e) => setClient(e.target.value)}
+                    className="w-full bg-transparent focus:outline-none text-sm text-gray-800"
+                    required
+                  >
+                    <option value="">Selecciona Cliente</option>
+                    {clients.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                  </select>
+                  {/* Botón para alternar a añadir nuevo cliente, visible cuando se está seleccionando cliente existente */}
+                  <button
+                    onClick={handleToggleNewClient}
+                    className="ml-2 p-1.5 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 focus:outline-none transition-colors shadow-sm"
+                    title="Añadir nuevo cliente"
+                  >
+                    <Plus size={20} />
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
