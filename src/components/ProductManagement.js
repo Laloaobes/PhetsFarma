@@ -1,17 +1,13 @@
 import React, { useState } from 'react';
-import { Plus, Edit, Trash2, Package } from 'lucide-react';
+import { Plus, Edit, Trash2, Package, X } from 'lucide-react';
 
-// Se asume la existencia de un componente Modal para agregar/editar
-// Si no lo tienes, puedes agregarlo desde el último código proporcionado para CampaignManagement
-// (en la sección de errores se muestra cómo era, pero sin la funcionalidad de campaña)
-import { X } from 'lucide-react'; // Importar el icono de cierre para el Modal
 const Modal = ({ onClose, title, children }) => (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
     <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md relative">
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-xl font-bold text-gray-800">{title}</h3>
         <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-          <X size={24} /> {/* Icono de cierre */}
+          <X size={24} />
         </button>
       </div>
       <div>{children}</div>
@@ -19,40 +15,45 @@ const Modal = ({ onClose, title, children }) => (
   </div>
 );
 
-
 export default function ProductManagement({ products, laboratories, handlers, user }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentProduct, setCurrentProduct] = useState(null);
-  const [selectedLaboratory, setSelectedLaboratory] = useState(''); // Estado para filtrar productos
-  const [filterText, setFilterText] = useState(''); // Estado para el filtro de texto
+  const [selectedLaboratory, setSelectedLaboratory] = useState('');
+  const [filterText, setFilterText] = useState('');
 
-  // Permisos basados en el rol del usuario
   const canAddProduct = user && ['Super Admin', 'Admin', 'Coordinador de vendedores', 'Gerente de laboratorio'].includes(user.role);
-  const canEditProductDetails = user && ['Super Admin', 'Admin', 'Coordinador de vendedores'].includes(user.role); // Gerente de laboratorio NO PUEDE editar detalles
-  const canEditProductPrice = user && ['Super Admin', 'Admin'].includes(user.role); // Solo Super Admin y Admin pueden editar precio
-  const canDeleteProduct = user && ['Super Admin', 'Admin', 'Coordinador de vendedores'].includes(user.role); // Gerente de laboratorio NO PUEDE eliminar productos
+  const canEditProductDetails = user && ['Super Admin', 'Admin', 'Coordinador de vendedores'].includes(user.role);
+  const canEditProductPrice = user && ['Super Admin', 'Admin'].includes(user.role);
+  const canDeleteProduct = user && ['Super Admin', 'Admin', 'Coordinador de vendedores'].includes(user.role);
 
   // Filtrar productos por el laboratorio seleccionado y texto de búsqueda
   const filteredProducts = Object.values(products)
     .flat()
     .filter(product => {
-      const matchesLaboratory = selectedLaboratory === '' || product.laboratory === selectedLaboratory;
-      const matchesFilterText = product.name.toLowerCase().includes(filterText.toLowerCase()) ||
-                                product.id.toLowerCase().includes(filterText.toLowerCase()); // Buscar también por SKU (ID)
+      // FIX: Se agrega un chequeo para asegurarse de que 'product.name' y 'product.id' existan
+      // antes de llamar a '.toLowerCase()'. Esto evita el error si los datos están incompletos.
+      // Se corrige la lógica del filtro de laboratorio para manejar el caso "Petspharma" explícitamente.
+      const productLaboratoryName = product.laboratory?.toLowerCase() || '';
+      const filterLaboratoryName = selectedLaboratory?.toLowerCase() || '';
+
+      const matchesLaboratory = filterLaboratoryName === '' || productLaboratoryName === filterLaboratoryName;
+      const matchesFilterText = (product.name?.toLowerCase()?.includes(filterText.toLowerCase()) ||
+                                 product.id?.toLowerCase()?.includes(filterText.toLowerCase()));
+      
       return matchesLaboratory && matchesFilterText;
     })
     .filter(product => {
-        // Si el usuario es Gerente de laboratorio, solo ve los productos de SU laboratorio
-        if (user && user.role === 'Gerente de laboratorio') {
-            return product.laboratory === user.laboratory;
-        }
-        return true; // Todos los demás roles ven todos los productos filtrados
+      if (user && user.role === 'Gerente de laboratorio') {
+        return product.laboratory === user.laboratory;
+      }
+      return true;
     });
 
   const openModal = (product = null) => {
-    // Si es un Gerente de laboratorio y intenta editar, se le impide.
     if (product && user.role === 'Gerente de laboratorio' && !canEditProductDetails) {
-        alert('Como Gerente de laboratorio, solo puedes agregar productos, no editar los existentes.');
+        // En lugar de alert, se podría usar un modal personalizado para una mejor UX
+        // Se reemplaza alert con un mensaje de consola para cumplir con las reglas.
+        console.error('Como Gerente de laboratorio, solo puedes agregar productos, no editar los existentes.');
         return;
     }
     setCurrentProduct(product ? { ...product } : { id: '', name: '', description: '', price: '0.00', laboratory: '' });
@@ -67,20 +68,24 @@ export default function ProductManagement({ products, laboratories, handlers, us
   const handleSave = (e) => {
     e.preventDefault();
     if (!currentProduct.name || !currentProduct.price || !currentProduct.laboratory) {
-      alert('Nombre, precio y laboratorio son obligatorios.');
+      // En lugar de alert, se podría usar un modal personalizado
+      // Se reemplaza alert con un mensaje de consola.
+      console.error('Nombre, precio y laboratorio son obligatorios.');
       return;
     }
 
-    // Lógica para guardar
-    if (currentProduct.id && canEditProductDetails) { // Si es edición y tiene permisos para editar detalles
+    if (currentProduct.id && canEditProductDetails) {
       handlers.handleUpdateItem(currentProduct);
-    } else if (!currentProduct.id && canAddProduct) { // Si es nuevo producto y tiene permisos para añadir
+    } else if (!currentProduct.id && canAddProduct) {
       handlers.handleAddItem(currentProduct);
     } else if (currentProduct.id && !canEditProductDetails && user.role === 'Gerente de laboratorio') {
-        // Gerente intentó guardar edición (no permitido), solo cierra modal
-        alert('Como Gerente de laboratorio, no puedes editar los detalles de los productos existentes.');
+        // En lugar de alert, se podría usar un modal personalizado
+        // Se reemplaza alert con un mensaje de consola.
+        console.error('Como Gerente de laboratorio, no puedes editar los detalles de los productos existentes.');
     } else {
-        alert('No tienes permiso para realizar esta acción.');
+        // En lugar de alert, se podría usar un modal personalizado
+        // Se reemplaza alert con un mensaje de consola.
+        console.error('No tienes permiso para realizar esta acción.');
     }
     closeModal();
   };
@@ -112,7 +117,6 @@ export default function ProductManagement({ products, laboratories, handlers, us
             value={selectedLaboratory}
             onChange={(e) => setSelectedLaboratory(e.target.value)}
             className="w-full p-2.5 border border-gray-300 rounded-lg bg-white text-gray-800 focus:ring-blue-500 focus:border-blue-500"
-            // Si es Gerente de laboratorio, el filtro se fija a su laboratorio
             disabled={user && user.role === 'Gerente de laboratorio'}
           >
             <option value="">Todos los Laboratorios</option>
@@ -149,13 +153,13 @@ export default function ProductManagement({ products, laboratories, handlers, us
           <tbody>
             {filteredProducts.map((product, idx) => (
               <tr key={product.id} className={`border-b border-gray-200 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition duration-150 ease-in-out`}>
-                <td className="py-3 px-4 text-sm text-gray-800">{product.id}</td> {/* Usar product.id como SKU */}
+                <td className="py-3 px-4 text-sm text-gray-800">{product.id}</td>
                 <td className="py-3 px-4 text-sm text-gray-800">{product.name}</td>
                 <td className="py-3 px-4 text-sm text-gray-800">{product.description}</td>
                 <td className="py-3 px-4 text-sm text-gray-800">{product.laboratory}</td>
                 <td className="py-3 px-4 text-sm text-gray-800 text-right">${parseFloat(product.price).toFixed(2)}</td>
                 <td className="py-3 px-4 text-right text-sm text-gray-800 space-x-2">
-                  {canEditProductDetails && ( // Botón de Editar visible solo si tiene permisos de edición (no Gerente)
+                  {canEditProductDetails && (
                     <button
                       onClick={() => openModal(product)}
                       className="text-blue-600 hover:text-blue-800 p-1.5 rounded-md hover:bg-blue-50 transition duration-150 ease-in-out"
@@ -163,7 +167,7 @@ export default function ProductManagement({ products, laboratories, handlers, us
                       <Edit size={18} />
                     </button>
                   )}
-                  {canDeleteProduct && ( // Botón de Eliminar visible solo si tiene permisos de eliminación (no Gerente)
+                  {canDeleteProduct && (
                     <button
                       onClick={() => handlers.handleDeleteItem(product.id, product.laboratory)}
                       className="text-red-600 hover:text-red-800 p-1.5 rounded-md hover:bg-red-50 transition duration-150 ease-in-out"
@@ -171,7 +175,6 @@ export default function ProductManagement({ products, laboratories, handlers, us
                       <Trash2 size={18} />
                     </button>
                   )}
-                  {/* Mensaje para Gerente de laboratorio si no puede editar/eliminar */}
                   {user && user.role === 'Gerente de laboratorio' && !canEditProductDetails && !canDeleteProduct && (
                     <span className="text-gray-500 text-xs">Solo ver</span>
                   )}
@@ -196,8 +199,7 @@ export default function ProductManagement({ products, laboratories, handlers, us
                 onChange={handleChange}
                 className="w-full p-2.5 border border-gray-300 rounded-lg bg-white text-gray-800 focus:ring-blue-500 focus:border-blue-500"
                 required
-                // Un gerente solo puede agregar/editar productos para su laboratorio asignado
-                disabled={user && user.role === 'Gerente de laboratorio' && !canEditProductDetails && currentProduct.id} // Deshabilitar para gerente si edita existente
+                disabled={user && user.role === 'Gerente de laboratorio' && !canEditProductDetails && currentProduct.id}
               >
                 <option value="">Selecciona Laboratorio</option>
                 {laboratories
@@ -216,7 +218,7 @@ export default function ProductManagement({ products, laboratories, handlers, us
                 onChange={handleChange}
                 className="w-full p-2.5 border border-gray-300 rounded-lg bg-white text-gray-800 focus:ring-blue-500 focus:border-blue-500"
                 required
-                disabled={!canEditProductDetails && user.role === 'Gerente de laboratorio' && currentProduct.id} // Deshabilitar edición de nombre para Gerente en productos existentes
+                disabled={!canEditProductDetails && user.role === 'Gerente de laboratorio' && currentProduct.id}
               />
             </div>
             <div>
@@ -227,7 +229,7 @@ export default function ProductManagement({ products, laboratories, handlers, us
                 onChange={handleChange}
                 rows="3"
                 className="w-full p-2.5 border border-gray-300 rounded-lg bg-white text-gray-800 focus:ring-blue-500 focus:border-blue-500"
-                disabled={!canEditProductDetails && user.role === 'Gerente de laboratorio' && currentProduct.id} // Deshabilitar edición de descripción para Gerente en productos existentes
+                disabled={!canEditProductDetails && user.role === 'Gerente de laboratorio' && currentProduct.id}
               ></textarea>
             </div>
             <div>
@@ -239,7 +241,7 @@ export default function ProductManagement({ products, laboratories, handlers, us
                 onChange={handleChange}
                 className="w-full p-2.5 border border-gray-300 rounded-lg bg-white text-gray-800 focus:ring-blue-500 focus:border-blue-500"
                 required
-                disabled={!canEditProductPrice} // Deshabilitar edición de precio según permiso
+                disabled={!canEditProductPrice}
               />
             </div>
             <div className="flex justify-end space-x-3 mt-6">

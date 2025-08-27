@@ -8,7 +8,7 @@ export default function AdminPanel({ onNavigate, onLogout, currentView, user }) 
     // Gestionar Productos: Gerente de laboratorio puede ver/agregar, pero no editar precio.
     { name: 'Gestionar Productos', view: 'manageProducts', icon: <Package size={20} />, roles: ['Super Admin', 'Admin', 'Coordinador de vendedores', 'Gerente de laboratorio'] },
     // Gestionar Vendedores: El rol "Representante/Promotor" se llama ahora "Vendedor" y se gestiona aquí.
-    { name: 'Gestionar Vendedores', view: 'manageSellers', icon: <UserCircle size={20} />, roles: ['Super Admin', 'Admin', 'Coordinador de vendedores'] }, 
+    { name: 'Gestionar Representante/Promotor', view: 'manageSellers', icon: <UserCircle size={20} />, roles: ['Super Admin', 'Admin', 'Coordinador de vendedores'] }, 
     { name: 'Gestionar Clientes', view: 'manageClients', icon: <Users size={20} />, roles: ['Super Admin', 'Admin', 'Coordinador de vendedores'] },
     { name: 'Gestionar Distribuidores', view: 'manageDistributors', icon: <Truck size={20} />, roles: ['Super Admin', 'Admin', 'Coordinador de vendedores'] },
     { name: 'Gestionar Laboratorios', view: 'manageLaboratories', icon: <FlaskConical size={20} />, roles: ['Super Admin'] }, // Solo Super Admin

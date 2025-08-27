@@ -59,7 +59,7 @@ export default function GenericManagement({ items, handlers, itemName, user }) {
 
   return (
     <div className="p-4 md:p-6 bg-white rounded-xl shadow-lg">
-      <h2 className="text-2xl font-bold text-gray-800 mb-6">Gestión de {itemName}s</h2>
+      <h2 className="text-2xl font-bold text-gray-800 mb-6">Gestión de {itemName}</h2>
 
       {canAdd && (
         <div className="mb-6 flex flex-col sm:flex-row items-center space-y-3 sm:space-y-0 sm:space-x-3">
@@ -122,7 +122,7 @@ export default function GenericManagement({ items, handlers, itemName, user }) {
         </table>
       </div>
       {items.length === 0 && (
-        <p className="text-center text-gray-500 mt-6">No hay {itemName}s registrados.</p>
+        <p className="text-center text-gray-500 mt-6">No hay {itemName} registrados.</p>
       )}
     </div>
   );

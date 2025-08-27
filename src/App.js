@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
 // Importa AdminPanel para la navegación principal
-import AdminPanel from './components/AdminPanel'; 
+import AdminPanel from './components/AdminPanel';
 import OrderForm from './components/OrderForm';
 import OrderSummary from './components/OrderSummary';
 import Reports from './components/ReportsView';
 import GenericManagement from './components/GenericManagement';
 import ProductManagement from './components/ProductManagement';
-import UserManagement from './components/UserManagement'; 
-import Login from './components/Login'; 
+import UserManagement from './components/UserManagement';
 
-import { phetsfarmaProducts, kironProducts, vetsPharmaProducts } from './data/productList'; 
+import Login from './components/Login';
+
+import { petspharmaProducts, kironProducts, vetsPharmaProducts } from './data/productList';
 
 // Datos de ejemplo para la aplicación
 const initialData = {
@@ -18,15 +19,15 @@ const initialData = {
   clients: [],
   distributors: [],
   laboratories: [
-    { id: 1, name: 'Phetsfarma' },
+    { id: 1, name: 'Pets Pharma' },
     { id: 2, name: 'Kiron' },
-    { id: 3, name: 'Vets Pharma' }, 
+    { id: 3, name: 'Vets Pharma' },
   ],
-  users: [ 
+  users: [
     { id: 1, username: 'superadmin', password: 'password', name: 'Admin General', role: 'Super Admin' },
     { id: 2, username: 'admin', password: 'password', name: 'Administrador', role: 'Admin' },
     { id: 3, username: 'gerente_kiron', password: 'password', name: 'Gerente Kiron', role: 'Gerente de laboratorio', laboratory: 'Kiron' },
-    { id: 4, username: 'gerente_phetsfarma', password: 'password', name: 'Gerente Phetsfarma', role: 'Gerente de laboratorio', laboratory: 'Phetsfarma' },
+    { id: 4, username: 'gerente_petspharma', password: 'password', name: 'Gerente Pets Pharma', role: 'Gerente de laboratorio', laboratory: 'Pets Pharma' },
     { id: 5, username: 'gerente_vetspharma', password: 'password', name: 'Gerente Vets Pharma', role: 'Gerente de laboratorio', laboratory: 'Vets Pharma' },
     { id: 6, username: 'coordinador_ventas', password: 'password', name: 'Coordinador Ventas', role: 'Coordinador de vendedores' }, // Rol actualizado
     { id: 7, username: 'vendedor_ana', password: 'password', name: 'Vendedor Ana', role: 'Vendedor' }, // Nuevo rol consolidado
@@ -36,9 +37,9 @@ const initialData = {
 
 // Productos iniciales, estructurados directamente por laboratorio usando los imports
 const initialProductsByLab = {
-  'Phetsfarma': phetsfarmaProducts, 
+  'Pets Pharma': petspharmaProducts,
   'Kiron': kironProducts,
-  'Vets Pharma': vetsPharmaProducts 
+  'Vets Pharma': vetsPharmaProducts
 };
 
 // Función para generar 15 órdenes de ejemplo con diferentes fechas de agosto de 2025
@@ -46,10 +47,10 @@ const generateSampleOrders = () => {
   const sampleSellers = ['Vendedor Ana', 'Vendedor Carlos', 'Juan Pérez']; // Nombres de vendedores de ejemplo
   const sampleClients = ['Veterinaria Central', 'Pet Shop Feliz', 'Animalandia'];
   const sampleDistributors = ['Distribuidora A', 'Distribuidora B', 'DistriVet']; // Los distribuidores no son roles de usuario directo aquí
-  const sampleLaboratories = ['Phetsfarma', 'Kiron', 'Vets Pharma'];
+  const sampleLaboratories = ['Pets Pharma', 'Kiron', 'Vets Pharma'];
 
   const allProducts = [
-    ...phetsfarmaProducts,
+    ...petspharmaProducts,
     ...kironProducts,
     ...vetsPharmaProducts
   ];
@@ -71,45 +72,45 @@ const generateSampleOrders = () => {
 
     // Asegurarse de que los productos para el laboratorio seleccionado existan
     const availableLabProducts = allProducts.filter(p => p.laboratory === laboratory);
-    
+
     if (availableLabProducts.length === 0) {
         console.warn(`No hay productos definidos para el laboratorio ${laboratory}. Saltando esta orden de ejemplo.`);
-        continue; 
+        continue;
     }
 
     // Determinar el descuento máximo basado en el laboratorio
     let maxDiscountForLab = 0.30; // Default 30% para Kiron
-    if (laboratory === 'Phetsfarma' || laboratory === 'Vets Pharma') {
-      maxDiscountForLab = 0.65; // 65% para Phetsfarma y Vets Pharma
+    if (laboratory === 'Pets Pharma' || laboratory === 'Vets Pharma') {
+      maxDiscountForLab = 0.65; // 65% para Pets Pharma y Vets Pharma
     }
 
     for (let j = 0; j < numItems; j++) {
         const randomProduct = availableLabProducts[Math.floor(Math.random() * availableLabProducts.length)];
-        
+
         const quantity = Math.floor(Math.random() * 5) + 1; // 1 a 5 unidades
         const bonus = Math.floor(Math.random() * 2); // 0 o 1 bonus
         const price = randomProduct.price;
-        
+
         // Generar un descuento aleatorio dentro del rango permitido para el laboratorio
         const maxIncrements = Math.floor(maxDiscountForLab / 0.05); // Número de incrementos de 5%
         const discount = (Math.floor(Math.random() * (maxIncrements + 1)) * 0.05); // Incluye 0%
 
         const itemTotal = ((quantity + bonus) * price * (1 - discount));
-        
+
         orderItems.push({
-            sku: randomProduct.id, // Usar el ID del producto como SKU
-            productName: randomProduct.name,
-            quantity: quantity.toString(),
-            bonus: bonus.toString(),
-            price: price.toFixed(2),
-            discount: discount.toFixed(2),
-            total: itemTotal.toFixed(2),
+          sku: randomProduct.id, // Usar el ID del producto como SKU
+          productName: randomProduct.name,
+          quantity: quantity.toString(),
+          bonus: bonus.toString(),
+          price: price.toFixed(2),
+          discount: discount.toFixed(2),
+          total: itemTotal.toFixed(2),
         });
         currentOrderSubtotal += itemTotal;
     }
-    
+
     const finalSubtotal = parseFloat(currentOrderSubtotal.toFixed(2));
-    const finalDiscountAmount = 0; 
+    const finalDiscountAmount = 0;
     const finalGrandTotal = finalSubtotal - finalDiscountAmount;
 
     orders.push({
@@ -135,47 +136,47 @@ const initialOrders = generateSampleOrders();
 
 export default function App() {
   const [user, setUser] = useState(null); // Objeto de usuario con rol
-  const [currentView, setCurrentView] = useState('login'); 
-  const [lastView, setLastView] = useState('login'); 
+  const [currentView, setCurrentView] = useState('login');
+  const [lastView, setLastView] = useState('login');
   const [orders, setOrders] = useState(initialOrders);
-  const [data, setData] = useState(initialData); 
-  const [products, setProducts] = useState(initialProductsByLab); 
-  const [promotions, setPromotions] = useState({}); 
-  const [currentOrder, setCurrentOrder] = useState(null); 
+  const [data, setData] = useState(initialData);
+  const [products, setProducts] = useState(initialProductsByLab);
+  const [promotions, setPromotions] = useState({});
+  const [currentOrder, setCurrentOrder] = useState(null);
 
   // Efecto para cargar el usuario desde localStorage al iniciar la app
   useEffect(() => {
     const savedUser = localStorage.getItem("salesUser");
     if (savedUser) {
       setUser(JSON.parse(savedUser));
-      setCurrentView("orderForm"); 
+      setCurrentView("orderForm");
     }
   }, []);
 
   // Función para manejar el login
   const handleLogin = (loggedInUser) => {
     setUser(loggedInUser);
-    localStorage.setItem("salesUser", JSON.stringify(loggedInUser)); 
-    setCurrentView("orderForm"); 
+    localStorage.setItem("salesUser", JSON.stringify(loggedInUser));
+    setCurrentView("orderForm");
   };
 
   // Función para manejar el logout
   const handleLogout = () => {
     setUser(null);
-    localStorage.removeItem("salesUser"); 
-    setCurrentView("login"); 
+    localStorage.removeItem("salesUser");
+    setCurrentView("login");
   };
 
   const handleNavigate = (view, order = null) => {
-    setLastView(currentView); 
+    setLastView(currentView);
     setCurrentView(view);
-    setCurrentOrder(order); 
+    setCurrentOrder(order);
   };
 
   const handleSaveOrder = (newOrder) => {
-    setOrders([...orders, newOrder]); 
-    setCurrentOrder(newOrder); 
-    handleNavigate('orderSummary', newOrder); 
+    setOrders([...orders, newOrder]);
+    setCurrentOrder(newOrder);
+    handleNavigate('orderSummary', newOrder);
   };
 
   // Función de impresión con estilo EXACTO de la imagen proporcionada
@@ -188,15 +189,15 @@ export default function App() {
     // Estilos CSS replicando la imagen proporcionada
     const printStyles = `
       @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-      body { 
-        font-family: 'Inter', sans-serif; 
-        margin: 0; 
-        padding: 0; 
+      body {
+        font-family: 'Inter', sans-serif;
+        margin: 0;
+        padding: 0;
         background-color: #f3f4f6; /* Fondo gris claro */
-        -webkit-print-color-adjust: exact; 
-        print-color-adjust: exact; 
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
       }
-      .print-page-container { 
+      .print-page-container {
         max-width: 800px; /* Ancho ajustado para la imagen */
         margin: 40px auto; /* Centrado vertical y horizontal */
         padding: 32px; /* p-8 */
@@ -204,7 +205,7 @@ export default function App() {
         border-radius: 8px;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06); /* Sombra suave */
       }
-      h1 { 
+      h1 {
         font-size: 1.5rem; /* text-2xl */
         font-weight: 700; /* font-bold */
         color: #1f2937; /* text-gray-800 */
@@ -228,8 +229,8 @@ export default function App() {
 
       .products-table-section {
         /* No border-top o border-bottom general para la sección, se manejarán en rows */
-        padding-top: 0; 
-        padding-bottom: 0; 
+        padding-top: 0;
+        padding-bottom: 0;
         margin-top: 24px; /* Espacio entre info y productos */
         margin-bottom: 24px; /* Espacio antes del total */
       }
@@ -287,19 +288,19 @@ export default function App() {
         max-width: 300px; /* Ancho fijo para la sección de totales */
         padding: 4px 0; /* Espaciado para la fila del total */
       }
-      .total-row .total-label { 
+      .total-row .total-label {
         font-size: 1.8rem; /* text-3xl */
         font-weight: 700; /* font-bold */
         color: #1f2937; /* text-gray-800 */
       }
-      .total-row .total-value { 
+      .total-row .total-value {
         font-size: 1.8rem; /* text-3xl */
         font-weight: 700; /* font-bold */
         color: #1f2937; /* text-gray-800 */
       }
 
-      .footer-text { 
-        text-align: center; 
+      .footer-text {
+        text-align: center;
         font-size: 0.75rem; /* text-xs */
         color: #9ca3af; /* text-gray-400 */
         margin-top: 32px; /* mt-8 */
@@ -375,7 +376,8 @@ export default function App() {
       printWindow.focus();
       printWindow.print();
     } else {
-      alert("No se pudo abrir la ventana de impresión. Por favor, asegúrese de que las ventanas emergentes estén permitidas.");
+      // Reemplazando alert() por un mensaje en la consola
+      console.error("No se pudo abrir la ventana de impresión. Por favor, asegúrese de que las ventanas emergentes estén permitidas.");
     }
   };
 
@@ -383,7 +385,7 @@ export default function App() {
     handleAddItem: (item) => {
       setData(prevData => ({
         ...prevData,
-        [key]: [...prevData[key], { ...item, id: Date.now() }] 
+        [key]: [...prevData[key], { ...item, id: Date.now() }]
       }));
     },
     handleUpdateItem: (updatedItem) => {
@@ -393,8 +395,9 @@ export default function App() {
       }));
     },
     handleDeleteItem: (id) => {
-      // Confirmación de eliminación solo para elementos que no son usuarios
-      if (key !== 'users' && window.confirm(`¿Estás seguro de que quieres eliminar este ${key.slice(0, -1)}?`)) {
+      // Reemplazando window.confirm() por un mensaje en la consola para confirmar
+      if (key !== 'users') {
+        console.warn(`Confirmación de eliminación: ¿Estás seguro de que quieres eliminar este ${key.slice(0, -1)}?`);
         setData(prevData => ({
           ...prevData,
           [key]: prevData[key].filter(item => item.id !== id)
@@ -426,12 +429,12 @@ export default function App() {
       }));
     },
     handleDeleteItem: (id, laboratoryName) => {
-      if (window.confirm(`¿Estás seguro de que quieres eliminar este producto del laboratorio ${laboratoryName}?`)) {
-        setProducts(prevProducts => ({
-          ...prevProducts,
-          [laboratoryName]: prevProducts[laboratoryName].filter(item => item.id !== id)
-        }));
-      }
+      // Reemplazando window.confirm() por un mensaje en la consola
+      console.warn(`Confirmación de eliminación: ¿Estás seguro de que quieres eliminar este producto del laboratorio ${laboratoryName}?`);
+      setProducts(prevProducts => ({
+        ...prevProducts,
+        [laboratoryName]: prevProducts[laboratoryName].filter(item => item.id !== id)
+      }));
     },
   };
   
@@ -445,7 +448,7 @@ export default function App() {
         return (
           <OrderForm
             onSaveOrder={handleSaveOrder}
-            products={products} 
+            products={products}
             clients={data.clients}
             sellers={data.sellers}
             distributors={data.distributors}
@@ -471,7 +474,7 @@ export default function App() {
             sellers={data.sellers}
             distributors={data.distributors}
             laboratories={data.laboratories}
-            products={products} 
+            products={products}
             user={user} // Pasar el usuario
           />
         );
@@ -489,7 +492,7 @@ export default function App() {
           <GenericManagement
             items={data.sellers}
             handlers={genericHandlers('sellers')}
-            itemName="Vendedor" // Nombre actualizado
+            itemName="Representante/Promotor" // Nombre actualizado
             user={user} // Pasar el usuario
           />
         );
@@ -514,19 +517,19 @@ export default function App() {
       case 'manageProducts':
         return (
           <ProductManagement
-            products={products} 
+            products={products}
             laboratories={data.laboratories}
             handlers={productHandlers}
             user={user} // Pasar el usuario
           />
         );
-      case 'manageUsers': 
+      case 'manageUsers':
         return (
           <UserManagement
-            users={data.users} 
-            handlers={genericHandlers('users')} 
-            laboratories={data.laboratories} 
-            user={user} 
+            users={data.users}
+            handlers={genericHandlers('users')}
+            laboratories={data.laboratories}
+            user={user}
           />
         );
       default:

@@ -63,9 +63,6 @@ const ProductRow = ({ item, index, onUpdate, onRemove, productList, laboratory, 
     }
   };
 
-  // Permiso para cambiar precio: Siempre mostrar fijo, no editable.
-  // La lógica canEditPrice ha sido eliminada.
-
   return (
     <div className="flex flex-col p-3 bg-gray-50 rounded-lg mb-4 shadow-sm border border-gray-200">
       <div className="grid grid-cols-1 md:grid-cols-12 gap-2 items-center">
@@ -175,11 +172,11 @@ const ProductRow = ({ item, index, onUpdate, onRemove, productList, laboratory, 
   );
 };
 
-export default function OrderForm({ onSaveOrder, products, clients, sellers, distributors, laboratories, user }) {
-  // Estado inicial del vendedor y distribuidor para el rol 'Vendedor'
-  const [seller, setSeller] = useState(user && user.role === 'Vendedor' ? user.name : "");
+export default function OrderForm({ onSaveOrder, products, clients, representatives = [], distributors = [], laboratories = [], user }) {
+  // Estado inicial para el representante.
+  const [representative, setRepresentative] = useState(user && user.role === 'Representante' ? user.name : "");
   const [client, setClient] = useState("");
-  const [distributor, setDistributor] = useState(user && user.role === 'Vendedor' ? user.name : ""); // Los distribuidores también pueden ser 'Vendedor'
+  const [distributor, setDistributor] = useState(user && user.role === 'Representante' ? user.name : "");
 
   const [laboratory, setLaboratory] = useState(user && user.role === 'Gerente de laboratorio' ? user.laboratory : "");
 
@@ -188,8 +185,6 @@ export default function OrderForm({ onSaveOrder, products, clients, sellers, dis
   const [rawSubtotal, setRawSubtotal] = useState(0); 
   const [itemLevelDiscountAmount, setItemLevelDiscountAmount] = useState(0); 
   const [finalTotal, setFinalTotal] = useState(0); 
-
-  const [globalDiscount, setGlobalDiscount] = useState(0); 
 
   const [showModal, setShowModal] = useState(false);
   const [modalMessage, setModalMessage] = useState("");
@@ -201,8 +196,8 @@ export default function OrderForm({ onSaveOrder, products, clients, sellers, dis
 
   // Calcular el máximo descuento permitido para el laboratorio seleccionado
   const getMaxDiscountPercentageForLab = () => {
-    if (laboratory === 'Phetsfarma' || laboratory === 'Vets Pharma') {
-      return 0.65; // 65% para Phetsfarma y Vets Pharma
+    if (laboratory === 'petspharma' || laboratory === 'Vets Pharma') {
+      return 0.65; // 65% para petspharma y Vets Pharma
     } else if (laboratory === 'Kiron') {
       return 0.30; // 30% para Kiron
     }
@@ -233,7 +228,6 @@ export default function OrderForm({ onSaveOrder, products, clients, sellers, dis
   // Efecto para resetear los items cuando el laboratorio cambia
   useEffect(() => {
     setItems([{ sku: "", productName: "", quantity: "1", bonus: "0", price: "0.00", discount: "0", total: "0.00" }]);
-    setGlobalDiscount(0); 
   }, [laboratory]);
 
 
@@ -244,7 +238,12 @@ export default function OrderForm({ onSaveOrder, products, clients, sellers, dis
   };
 
   const handleAddItem = () => {
-    setItems([...items, { sku: "", productName: "", quantity: "1", bonus: "0", price: "0.00", discount: "0", total: "0.00" }]);
+    if (laboratory) {
+      setItems([...items, { sku: "", productName: "", quantity: "1", bonus: "0", price: "0.00", discount: "0", total: "0.00" }]);
+    } else {
+      setModalMessage("Por favor, selecciona un laboratorio primero.");
+      setShowModal(true);
+    }
   };
 
   const handleRemoveItem = (index) => {
@@ -253,22 +252,21 @@ export default function OrderForm({ onSaveOrder, products, clients, sellers, dis
   };
   
   const handleSubmit = () => {
-    if (!client || items.some((i) => !i.productName || !i.price || parseFloat(i.price) <= 0)) {
-      setModalMessage("Por favor, completa el cliente y asegúrate de que todos los productos tengan nombre y precio válido.");
+    if (!client || !laboratory || items.some((i) => !i.productName || !i.price || parseFloat(i.price) <= 0)) {
+      setModalMessage("Por favor, completa el laboratorio, cliente y asegúrate de que todos los productos tengan nombre y precio válido.");
       setShowModal(true);
       return;
     }
     const order = {
       id: Date.now(),
       date: new Date().toISOString(),
-      seller,
+      representative,
       client,
       distributor,
       laboratory,
       items,
       subtotal: rawSubtotal,
       discountAmount: itemLevelDiscountAmount,
-      appliedGlobalDiscount: globalDiscount, 
       grandTotal: finalTotal,
     };
     onSaveOrder(order);
@@ -310,21 +308,20 @@ export default function OrderForm({ onSaveOrder, products, clients, sellers, dis
               </select>
             </div>
           </div>
-          {/* Vendedor */}
+          {/* Representante/Promotor */}
           <div className="flex flex-col bg-gray-100 p-3 rounded-lg">
-            <label htmlFor="seller-select" className="block text-gray-700 text-xs font-semibold mb-1">Vendedor</label>
+            <label htmlFor="representative-select" className="block text-gray-700 text-xs font-semibold mb-1">Representante/Promotor</label>
             <div className="flex items-center">
               <UserIcon className="text-gray-500 mr-3" />
               <select 
-                id="seller-select"
-                value={seller} 
-                onChange={(e) => setSeller(e.target.value)} 
+                id="representative-select"
+                value={representative} 
+                onChange={(e) => setRepresentative(e.target.value)} 
                 className="w-full bg-transparent focus:outline-none"
-                disabled={user && user.role === 'Vendedor'} 
+                disabled={user && user.role === 'Representante'} 
               >
-                <option value="">Selecciona Vendedor</option>
-                {/* Los sellers se rellenarían desde data.sellers si tuvieran datos */}
-                {sellers.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                <option value="">Selecciona Representante</option>
+                {representatives.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
               </select>
             </div>
           </div>
@@ -338,7 +335,7 @@ export default function OrderForm({ onSaveOrder, products, clients, sellers, dis
                 value={distributor} 
                 onChange={(e) => { setDistributor(e.target.value); }} 
                 className="w-full bg-transparent focus:outline-none"
-                disabled={user && user.role === 'Vendedor'} // Asumiendo que un Vendedor puede ser también un "Representante Distribuidor"
+                disabled={user && user.role === 'Representante'}
               >
                 <option value="">Selecciona Distribuidor</option>
                 {distributors.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}

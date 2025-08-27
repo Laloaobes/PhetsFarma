@@ -11,7 +11,7 @@ export default function Login({ onLogin }) {
     'superadmin': { password: 'password', role: 'Super Admin', name: 'Admin General' },
     'admin': { password: 'password', role: 'Admin', name: 'Administrador' },
     'gerente_kiron': { password: 'password', role: 'Gerente de laboratorio', name: 'Gerente Kiron', laboratory: 'Kiron' },
-    'gerente_phetsfarma': { password: 'password', role: 'Gerente de laboratorio', name: 'Gerente Phetsfarma', laboratory: 'Phetsfarma' },
+    'gerente_petspharma': { password: 'password', role: 'Gerente de laboratorio', name: 'Gerente petspharma', laboratory: 'petspharma' },
     'gerente_vetspharma': { password: 'password', role: 'Gerente de laboratorio', name: 'Gerente Vets Pharma', laboratory: 'Vets Pharma' },
     'coordinador': { password: 'password', role: 'Coordinador', name: 'Coordinador Ventas' },
     'representante1': { password: 'password', role: 'Representante/Promotor', name: 'Representante Ana' },
@@ -85,7 +85,7 @@ export default function Login({ onLogin }) {
           <ul className="list-disc list-inside text-left mx-auto max-w-xs">
             <li><span className="font-medium">Super Admin:</span> `superadmin` / `password`</li>
             <li><span className="font-medium">Admin:</span> `admin` / `password`</li>
-            <li><span className="font-medium">Gerentes Lab.:</span> `gerente_kiron`, `_phetsfarma`, `_vetspharma` / `password`</li>
+            <li><span className="font-medium">Gerentes Lab.:</span> `gerente_kiron`, `_petspharma`, `_vetspharma` / `password`</li>
             <li><span className="font-medium">Coordinador:</span> `coordinador` / `password`</li>
             <li><span className="font-medium">Representante:</span> `representante1` / `password`</li>
             <li><span className="font-medium">Rep. Distrib.:</span> `distribuidor1` / `password`</li>
