@@ -1,17 +1,32 @@
-import React from 'react';
+import React, { useState } from 'react'; // Importar useState
 import { Home, ClipboardList, Package, Users, Settings, LogOut, FlaskConical, Truck, UserCircle } from 'lucide-react'; 
 
 export default function AdminPanel({ onNavigate, onLogout, currentView, user }) {
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false); // Estado para controlar la visibilidad de la modal de confirmación
+
   const navItems = [
     { name: 'Inicio', view: 'orderForm', icon: <Home size={20} />, roles: ['Super Admin', 'Admin', 'Gerente de laboratorio', 'Coordinador de vendedores', 'Vendedor'] },
     { name: 'Reportes', view: 'reports', icon: <ClipboardList size={20} />, roles: ['Super Admin', 'Admin', 'Gerente de laboratorio', 'Coordinador de vendedores', 'Vendedor'] },
-    { name: 'Gestionar Productos', view: 'manageProducts', icon: <Package size={20} />, roles: ['Super Admin', 'Admin', 'Coordinador de vendedores', 'Gerente de laboratorio'] },
-    { name: 'Gestionar Representante/Promotor', view: 'manageSellers', icon: <UserCircle size={20} />, roles: ['Super Admin', 'Admin', 'Coordinador de vendedores'] }, 
-    { name: 'Gestionar Clientes', view: 'manageClients', icon: <Users size={20} />, roles: ['Super Admin', 'Admin', 'Coordinador de vendedores'] },
-    { name: 'Gestionar Distribuidores', view: 'manageDistributors', icon: <Truck size={20} />, roles: ['Super Admin', 'Admin', 'Coordinador de vendedores'] },
-    { name: 'Gestionar Laboratorios', view: 'manageLaboratories', icon: <FlaskConical size={20} />, roles: ['Super Admin'] },
-    { name: 'Gestionar Usuarios', view: 'manageUsers', icon: <Users size={20} />, roles: ['Super Admin'] },
+    { name: 'Productos', view: 'manageProducts', icon: <Package size={20} />, roles: ['Super Admin', 'Admin', 'Coordinador de vendedores', 'Gerente de laboratorio'] },
+    { name: 'Representante/Promotor', view: 'manageSellers', icon: <UserCircle size={20} />, roles: ['Super Admin', 'Admin', 'Coordinador de vendedores'] }, 
+    { name: 'Clientes', view: 'manageClients', icon: <Users size={20} />, roles: ['Super Admin', 'Admin', 'Coordinador de vendedores'] },
+    { name: 'Distribuidores', view: 'manageDistributors', icon: <Truck size={20} />, roles: ['Super Admin', 'Admin', 'Coordinador de vendedores'] },
+    { name: 'Laboratorios', view: 'manageLaboratories', icon: <FlaskConical size={20} />, roles: ['Super Admin'] },
+    { name: 'Usuarios', view: 'manageUsers', icon: <Users size={20} />, roles: ['Super Admin'] },
   ];
+
+  const handleLogoutClick = () => {
+    setShowLogoutConfirm(true); // Mostrar la modal de confirmación al hacer clic en Salir
+  };
+
+  const confirmLogout = () => {
+    onLogout(); // Llamar a la función de logout si se confirma
+    setShowLogoutConfirm(false); // Cerrar la modal
+  };
+
+  const cancelLogout = () => {
+    setShowLogoutConfirm(false); // Solo cerrar la modal si se cancela
+  };
 
   return (
     <nav className="bg-blue-800 text-white p-4 shadow-md sticky top-0 z-10">
@@ -39,13 +54,13 @@ export default function AdminPanel({ onNavigate, onLogout, currentView, user }) 
                   disabled={ (user && user.role !== 'Super Admin' && (item.view === 'manageLaboratories' || item.view === 'manageUsers')) }
                 >
                   {item.icon}
-                  <span className="ml-2 hidden 2xl:inline">{item.name}</span> {/* CAMBIO: Texto visible solo en pantallas extra-grandes (2xl) y superiores */}
+                  <span className="ml-2 hidden xl:inline">{item.name}</span> {/* CAMBIO: Texto visible solo en pantallas extra-grandes (xl) y superiores */}
                 </button>
               )
             ))}
           </div>
           <button
-            onClick={onLogout}
+            onClick={handleLogoutClick} // Llama a handleLogoutClick para mostrar la confirmación
             className="flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors hover:bg-red-700 hover:text-white bg-red-600 w-full md:w-auto justify-center md:ml-4"
           >
             <LogOut size={20} />
@@ -53,6 +68,30 @@ export default function AdminPanel({ onNavigate, onLogout, currentView, user }) 
           </button>
         </div>
       </div>
+
+      {/* Modal de Confirmación de Salida */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-xl text-center max-w-sm w-full">
+            <h3 className="text-lg font-bold mb-4 text-gray-800">Confirmar Salida</h3>
+            <p className="mb-6 text-gray-700">¿Estás seguro de que quieres salir de la aplicación?</p>
+            <div className="flex justify-center space-x-4">
+              <button
+                onClick={confirmLogout}
+                className="bg-red-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-700 transition duration-300"
+              >
+                Confirmar Salida
+              </button>
+              <button
+                onClick={cancelLogout}
+                className="bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-400 transition duration-300"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </nav>
   );
 }
