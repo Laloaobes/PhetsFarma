@@ -9,9 +9,9 @@ const PdfLayout = ({ order }) => {
   const getLogoSrc = (laboratory) => {
     switch (laboratory) {
       case 'Kiron':
-        return '/Kiron.png';
+        return '/kiron.png';
       case 'Vets Pharma':
-        return '/Vets.png';
+        return '/vets.png';
       case 'Pets Pharma':
         return '/LogoPets-1-1.png';
       default:
