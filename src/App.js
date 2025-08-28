@@ -66,8 +66,6 @@ export default function App() {
     const unsubOrders = onSnapshot(collection(db, "orders"), (snapshot) => setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), date: doc.data().date.toDate() }))));
     const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
     
-    // Se eliminó la suscripción a productos de Firestore
-
     return () => {
       unsubClients();
       unsubReps();
@@ -106,9 +104,85 @@ export default function App() {
     }
   };
 
-  const handlePrint = (order) => { 
-    if (!order) return;
-    console.log("Imprimiendo orden:", order);
+  const handlePrint = (order) => {
+    if (!order) {
+      console.error("No hay orden para imprimir.");
+      return;
+    }
+
+    const printStyles = `
+      body { font-family: Arial, sans-serif; margin: 20px; }
+      .print-container { max-width: 800px; margin: auto; }
+      h1 { font-size: 1.5rem; font-weight: bold; margin-bottom: 1rem; border-bottom: 2px solid #000; padding-bottom: 0.5rem;}
+      .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 1.5rem; font-size: 0.9rem; }
+      .table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; }
+      .table th, .table td { text-align: left; padding: 8px; border-bottom: 1px solid #ddd; }
+      .table th { background-color: #f2f2f2; }
+      .text-right { text-align: right; }
+      .totals { display: flex; flex-direction: column; align-items: flex-end; margin-top: 1.5rem; }
+      .totals div { width: 280px; display: flex; justify-content: space-between; padding: 4px 0; font-size: 0.9rem;}
+      .totals .grand-total { font-size: 1.25rem; font-weight: bold; border-top: 2px solid #333; margin-top: 0.5rem; }
+    `;
+
+    const itemsHtml = order.items.map(item => `
+      <tr>
+        <td>${item.productName}</td>
+        <td class="text-right">${item.quantity}</td>
+        <td class="text-right">$${parseFloat(item.price).toFixed(2)}</td>
+        <td class="text-right">${(parseFloat(item.discount) * 100).toFixed(0)}%</td>
+        <td class="text-right">$${parseFloat(item.total).toFixed(2)}</td>
+      </tr>
+    `).join('');
+
+    const printContent = `
+      <div class="print-container">
+        <h1>Resumen de Pedido #${String(order.id).slice(0, 8)}</h1>
+        <div class="info-grid">
+          <div><strong>Cliente:</strong> ${order.client}</div>
+          <div><strong>Representante:</strong> ${order.representative || 'N/A'}</div>
+          <div><strong>Fecha:</strong> ${new Date(order.date).toLocaleDateString()}</div>
+          <div><strong>Laboratorio:</strong> ${order.laboratory}</div>
+        </div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Producto</th>
+              <th class="text-right">Cant.</th>
+              <th class="text-right">P. Unit.</th>
+              <th class="text-right">Desc.</th>
+              <th class="text-right">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemsHtml}
+          </tbody>
+        </table>
+        <div class="totals">
+          <div>
+            <span>Subtotal:</span>
+            <span>$${order.subtotal.toFixed(2)}</span>
+          </div>
+          <div>
+            <span>Descuento:</span>
+            <span>-$${order.discountAmount.toFixed(2)}</span>
+          </div>
+          <div class="grand-total">
+            <span>Total Final:</span>
+            <span>$${order.grandTotal.toFixed(2)}</span>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const printWindow = window.open('', '', 'height=600,width=800');
+    printWindow.document.write('<html><head><title>Imprimir Pedido</title>');
+    printWindow.document.write('<style>' + printStyles + '</style>');
+    printWindow.document.write('</head><body>');
+    printWindow.document.write(printContent);
+    printWindow.document.write('</body></html>');
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
   };
 
   const genericHandlers = (key) => ({
@@ -181,8 +255,6 @@ export default function App() {
   };
 
   const productHandlers = {
-    // La lógica para gestionar productos ahora debería volver a ser local si es necesario
-    // o se puede implementar para que funcione con Firestore en el futuro.
   };
   
   const renderView = () => {
@@ -195,7 +267,7 @@ export default function App() {
         return (
           <OrderForm
             onSaveOrder={handleSaveOrder}
-            products={products} // Pasa los productos locales
+            products={products}
             clients={clients}
             representatives={representatives}
             distributors={distributors}

@@ -68,7 +68,7 @@ export default function UserManagement({ users, handlers, laboratories, user: lo
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1">Email (Login)</label>
             <input type="email" name="email" value={newUser.email} onChange={handleChange} className="w-full p-2.5 border rounded-lg" required disabled={!!editingUser} />
-            {!editingUser && <p className="text-xs text-gray-500 mt-1">Este email debe coincidir con el creado en Firebase Authentication.</p>}
+            
           </div>
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1">Nombre Completo</label>
