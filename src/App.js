@@ -40,16 +40,14 @@ const initialProductsByLab = {
   'Vets Pharma': vetsPharmaProducts
 };
 
-const initialOrders = []; // Los pedidos también se migrarán a Firestore eventualmente
-
 export default function App() {
   // Estados de la aplicación
   const [user, setUser] = useState(null);
   const [currentView, setCurrentView] = useState('login');
   const [lastView, setLastView] = useState('login');
-  const [orders, setOrders] = useState(initialOrders);
   
   // ---- ESTADOS PARA DATOS DE FIRESTORE ----
+  const [orders, setOrders] = useState([]);
   const [clients, setClients] = useState([]);
   const [representatives, setRepresentatives] = useState([]);
   const [distributors, setDistributors] = useState([]);
@@ -77,45 +75,54 @@ export default function App() {
     const unsubDists = onSnapshot(collection(db, "distributors"), (snapshot) => {
       setDistributors(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
+    // ---- NUEVA SUSCRIPCIÓN A PEDIDOS ----
+    const unsubOrders = onSnapshot(collection(db, "orders"), (snapshot) => {
+      const ordersList = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          // Firestore guarda las fechas como Timestamps, las convertimos a Date de JS
+          date: data.date.toDate() 
+        };
+      });
+      setOrders(ordersList);
+    });
 
     return () => {
       unsubClients();
       unsubReps();
       unsubDists();
+      unsubOrders(); // Limpiar suscripción de pedidos
     };
   }, []);
 
   // ---- HANDLERS DE NAVEGACIÓN Y SESIÓN ----
-  const handleLogin = (loggedInUser) => {
-    setUser(loggedInUser);
-    localStorage.setItem("salesUser", JSON.stringify(loggedInUser));
-    setCurrentView("orderForm");
-  };
-
-  const handleLogout = () => {
-    setUser(null);
-    localStorage.removeItem("salesUser");
-    setCurrentView("login");
-  };
-
+  const handleLogin = (loggedInUser) => { /* ... sin cambios ... */ };
+  const handleLogout = () => { /* ... sin cambios ... */ };
   const handleNavigate = (view, order = null) => {
     setLastView(currentView);
     setCurrentView(view);
     setCurrentOrder(order);
   };
 
-  const handleSaveOrder = (newOrder) => {
-    setOrders(prevOrders => [...prevOrders, newOrder]);
-    setCurrentOrder(newOrder);
-    handleNavigate('orderSummary', newOrder);
+  // ---- GUARDAR PEDIDO EN FIREBASE ----
+  const handleSaveOrder = async (orderData) => {
+    try {
+      // Usamos new Date() para asegurar que el formato sea correcto para Firestore
+      const orderToSave = { ...orderData, date: new Date() };
+      const docRef = await addDoc(collection(db, "orders"), orderToSave);
+      
+      // Navegamos al resumen con el pedido completo, incluyendo el nuevo ID de Firestore
+      handleNavigate('orderSummary', { ...orderToSave, id: docRef.id });
+    } catch (error) {
+      console.error("Error al guardar el pedido: ", error);
+    }
   };
 
-  const handlePrint = (order) => { 
-    if (!order) return;
-    console.log("Imprimiendo orden:", order);
-  };
+  const handlePrint = (order) => { /* ... sin cambios ... */ };
 
-  // ---- HANDLER GENÉRICO CON FUNCIONALIDAD CRUD COMPLETA PARA FIREBASE ----
+  // ---- HANDLER GENÉRICO CRUD PARA CLIENTES, REPS Y DISTS ----
   const genericHandlers = (key) => ({
     handleAddItem: async (item) => {
       if (['clients', 'representatives', 'distributors'].includes(key)) {
