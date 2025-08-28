@@ -70,10 +70,13 @@ const PdfLayout = ({ order }) => {
               <span>Subtotal:</span>
               <span>${order.subtotal.toFixed(2)}</span>
           </div>
-          <div className="flex justify-between text-red-600">
-              <span>Descuento:</span>
-              <span>-${order.discountAmount.toFixed(2)}</span>
-          </div>
+          {/* --- CAMBIO AQUÍ: El descuento solo se muestra si es mayor a 0 --- */}
+          {order.discountAmount > 0 && (
+            <div className="flex justify-between text-red-600">
+                <span>Descuento:</span>
+                <span>-${order.discountAmount.toFixed(2)}</span>
+            </div>
+          )}
           <div className="flex justify-between text-2xl font-bold border-t-2 border-gray-400 pt-2 mt-2">
             <span>Total:</span>
             <span>${order.grandTotal.toFixed(2)}</span>
@@ -145,7 +148,9 @@ export default function OrderSummary({ order, onNavigate, previousView }) {
       message += `- ${item.productName} (Cant: ${item.quantity}${bonusText}) Total: $${parseFloat(item.total).toFixed(2)}\n`;
     });
     message += `\nSubtotal: $${order.subtotal.toFixed(2)}`;
-    message += `\nDescuento: -$${order.discountAmount.toFixed(2)}`;
+    if (order.discountAmount > 0) {
+      message += `\nDescuento: -$${order.discountAmount.toFixed(2)}`;
+    }
     message += `\nTotal Final: $${order.grandTotal.toFixed(2)}`;
 
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
