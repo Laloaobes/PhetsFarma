@@ -11,8 +11,9 @@ import Login from './components/Login';
 
 // ---- IMPORTS DE FIREBASE ----
 import { db } from './firebase';
-import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc } from "firebase/firestore";
+import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, setDoc } from "firebase/firestore";
 
+// Se vuelve a importar la lista de productos local
 import { petspharmaProducts, kironProducts, vetsPharmaProducts } from './data/productList';
 
 // Datos locales que no se migrarán por ahora
@@ -21,19 +22,10 @@ const initialData = {
     { id: 1, name: 'Pets Pharma' },
     { id: 2, name: 'Kiron' },
     { id: 3, name: 'Vets Pharma' },
-  ],
-  users: [
-    { id: 1, username: 'superadmin', password: 'password', name: 'Admin General', role: 'Super Admin' },
-    { id: 2, username: 'admin', password: 'password', name: 'Administrador', role: 'Admin' },
-    { id: 3, username: 'gerente_kiron', password: 'password', name: 'Gerente Kiron', role: 'Gerente de laboratorio', laboratory: 'Kiron' },
-    { id: 4, username: 'gerente_petspharma', password: 'password', name: 'Gerente Pets Pharma', role: 'Gerente de laboratorio', laboratory: 'Pets Pharma' },
-    { id: 5, username: 'gerente_vetspharma', password: 'password', name: 'Gerente Vets Pharma', role: 'Gerente de laboratorio', laboratory: 'Vets Pharma' },
-    { id: 6, username: 'coordinador_ventas', password: 'password', name: 'Coordinador Ventas', role: 'Coordinador de vendedores' },
-    { id: 7, username: 'vendedor_ana', password: 'password', name: 'Vendedor Ana', role: 'Vendedor' },
-    { id: 8, username: 'vendedor_carlos', password: 'password', name: 'Vendedor Carlos', role: 'Vendedor' },
   ]
 };
 
+// Se vuelve a definir la constante para los productos locales
 const initialProductsByLab = {
   'Pets Pharma': petspharmaProducts,
   'Kiron': kironProducts,
@@ -51,8 +43,10 @@ export default function App() {
   const [clients, setClients] = useState([]);
   const [representatives, setRepresentatives] = useState([]);
   const [distributors, setDistributors] = useState([]);
+  const [users, setUsers] = useState([]);
   const [data, setData] = useState(initialData);
   
+  // El estado de productos ahora usa los datos locales de nuevo
   const [products, setProducts] = useState(initialProductsByLab);
   const [currentOrder, setCurrentOrder] = useState(null);
 
@@ -66,63 +60,57 @@ export default function App() {
 
   // ---- LEER DATOS DESDE FIREBASE EN TIEMPO REAL ----
   useEffect(() => {
-    const unsubClients = onSnapshot(collection(db, "clients"), (snapshot) => {
-      setClients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
-    const unsubReps = onSnapshot(collection(db, "representatives"), (snapshot) => {
-      setRepresentatives(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
-    const unsubDists = onSnapshot(collection(db, "distributors"), (snapshot) => {
-      setDistributors(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
-    // ---- NUEVA SUSCRIPCIÓN A PEDIDOS ----
-    const unsubOrders = onSnapshot(collection(db, "orders"), (snapshot) => {
-      const ordersList = snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          ...data,
-          // Firestore guarda las fechas como Timestamps, las convertimos a Date de JS
-          date: data.date.toDate() 
-        };
-      });
-      setOrders(ordersList);
-    });
+    const unsubClients = onSnapshot(collection(db, "clients"), (snapshot) => setClients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
+    const unsubReps = onSnapshot(collection(db, "representatives"), (snapshot) => setRepresentatives(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
+    const unsubDists = onSnapshot(collection(db, "distributors"), (snapshot) => setDistributors(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
+    const unsubOrders = onSnapshot(collection(db, "orders"), (snapshot) => setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), date: doc.data().date.toDate() }))));
+    const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
+    
+    // Se eliminó la suscripción a productos de Firestore
 
     return () => {
       unsubClients();
       unsubReps();
       unsubDists();
-      unsubOrders(); // Limpiar suscripción de pedidos
+      unsubOrders();
+      unsubUsers();
     };
   }, []);
 
-  // ---- HANDLERS DE NAVEGACIÓN Y SESIÓN ----
-  const handleLogin = (loggedInUser) => { /* ... sin cambios ... */ };
-  const handleLogout = () => { /* ... sin cambios ... */ };
+  // ---- HANDLERS ----
+  const handleLogin = (loggedInUser) => {
+    setUser(loggedInUser);
+    localStorage.setItem("salesUser", JSON.stringify(loggedInUser));
+    setCurrentView("orderForm");
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    localStorage.removeItem("salesUser");
+    setCurrentView("login");
+  };
+
   const handleNavigate = (view, order = null) => {
     setLastView(currentView);
     setCurrentView(view);
     setCurrentOrder(order);
   };
 
-  // ---- GUARDAR PEDIDO EN FIREBASE ----
   const handleSaveOrder = async (orderData) => {
     try {
-      // Usamos new Date() para asegurar que el formato sea correcto para Firestore
       const orderToSave = { ...orderData, date: new Date() };
       const docRef = await addDoc(collection(db, "orders"), orderToSave);
-      
-      // Navegamos al resumen con el pedido completo, incluyendo el nuevo ID de Firestore
       handleNavigate('orderSummary', { ...orderToSave, id: docRef.id });
     } catch (error) {
       console.error("Error al guardar el pedido: ", error);
     }
   };
 
-  const handlePrint = (order) => { /* ... sin cambios ... */ };
+  const handlePrint = (order) => { 
+    if (!order) return;
+    console.log("Imprimiendo orden:", order);
+  };
 
-  // ---- HANDLER GENÉRICO CRUD PARA CLIENTES, REPS Y DISTS ----
   const genericHandlers = (key) => ({
     handleAddItem: async (item) => {
       if (['clients', 'representatives', 'distributors'].includes(key)) {
@@ -156,11 +144,50 @@ export default function App() {
     },
   });
 
-  const productHandlers = { /* ... sin cambios ... */ };
+  const userHandlers = {
+    handleAddItem: async (newUser) => {
+      try {
+        const userDocRef = doc(db, "users", newUser.email);
+        await setDoc(userDocRef, {
+          name: newUser.name,
+          username: newUser.username,
+          role: newUser.role,
+          laboratory: newUser.laboratory || ''
+        });
+      } catch (error) {
+        console.error("Error al añadir usuario en Firestore: ", error);
+      }
+    },
+    handleUpdateItem: async (updatedUser) => {
+      try {
+        const userDocRef = doc(db, "users", updatedUser.id);
+        await updateDoc(userDocRef, {
+          name: updatedUser.name,
+          username: updatedUser.username,
+          role: updatedUser.role,
+          laboratory: updatedUser.laboratory || ''
+        });
+      } catch (error) {
+        console.error("Error al actualizar usuario en Firestore: ", error);
+      }
+    },
+    handleDeleteItem: async (userId) => {
+      try {
+        await deleteDoc(doc(db, "users", userId));
+      } catch (error) {
+        console.error("Error al eliminar usuario de Firestore: ", error);
+      }
+    },
+  };
+
+  const productHandlers = {
+    // La lógica para gestionar productos ahora debería volver a ser local si es necesario
+    // o se puede implementar para que funcione con Firestore en el futuro.
+  };
   
   const renderView = () => {
     if (!user) {
-      return <Login onLogin={handleLogin} users={data.users}/>;
+      return <Login onLogin={handleLogin} />;
     }
 
     switch (currentView) {
@@ -168,7 +195,7 @@ export default function App() {
         return (
           <OrderForm
             onSaveOrder={handleSaveOrder}
-            products={products}
+            products={products} // Pasa los productos locales
             clients={clients}
             representatives={representatives}
             distributors={distributors}
@@ -194,9 +221,9 @@ export default function App() {
       case 'manageProducts':
         return <ProductManagement products={products} laboratories={data.laboratories} handlers={productHandlers} user={user} />;
       case 'manageUsers':
-        return <UserManagement users={data.users} handlers={genericHandlers('users')} laboratories={data.laboratories} user={user} />;
+        return <UserManagement users={users} handlers={userHandlers} laboratories={data.laboratories} user={user} />;
       default:
-        return <div>Vista no encontrada: {currentView}</div>;
+        return <div>Vista no encontrada</div>;
     }
   };
 
