@@ -139,7 +139,7 @@ export default function ProductManagement({ products, laboratories, handlers, us
             <option value="">Todos los Laboratorios</option>
             {laboratories.map(lab => (
               <option key={lab.id} value={lab.name}>{lab.name}</option>
-            ))}
+            ))} 
           </select>
         </div>
         <div>

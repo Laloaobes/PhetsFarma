@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Home, ClipboardList, Package, Users, LogOut, FlaskConical, Truck, UserCircle } from 'lucide-react'; 
+import { Home, ClipboardList, Package, Users, LogOut, FlaskConical, Truck, UserCircle } from 'lucide-react';
 
 export default function AdminPanel({ onNavigate, onLogout, currentView, user }) {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -44,9 +44,9 @@ export default function AdminPanel({ onNavigate, onLogout, currentView, user }) 
                   key={item.name}
                   onClick={() => onNavigate(item.view)}
                   className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors 
-                                ${currentView === item.view ? 'bg-blue-700 text-white' : 'hover:bg-blue-700 hover:text-white'}
-                                flex-shrink-0
-                                `}
+                                   ${currentView === item.view ? 'bg-blue-700 text-white' : 'hover:bg-blue-700 hover:text-white'}
+                                   flex-shrink-0
+                                   `}
                 >
                   {item.icon}
                   <span className="ml-2 hidden xl:inline">{item.name}</span>
@@ -89,4 +89,3 @@ export default function AdminPanel({ onNavigate, onLogout, currentView, user }) 
     </nav>
   );
 }
-

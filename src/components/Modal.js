@@ -13,8 +13,8 @@ export default function Modal({ onClose, title, children }) {
         </div>
         <div>
           {children}
+          </div>
         </div>
-      </div>
     </div>
   );
 }

@@ -5,7 +5,8 @@ export default function ReportsView({ orders, onNavigate, sellers, distributors,
   const [filteredOrders, setFilteredOrders] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   
-  const [filterSeller, setFilterSeller] = useState(user?.role === 'Vendedor' ? user.name : '');
+  // FIX: Se usa el ID del usuario para filtrar, no el nombre
+  const [filterSeller, setFilterSeller] = useState(user?.role === 'Vendedor' ? user.id : '');
   const [filterDistributor, setFilterDistributor] = useState('');
   const [filterLaboratory, setFilterLaboratory] = useState(user?.role === 'Gerente de laboratorio' ? user.laboratory : '');
   
@@ -21,12 +22,11 @@ export default function ReportsView({ orders, onNavigate, sellers, distributors,
       }
     }
 
-    // --- CORRECCIÓN: Lógica de búsqueda más segura ---
     if (searchTerm) {
       const lowerCaseSearch = searchTerm.toLowerCase();
       tempOrders = tempOrders.filter(order =>
         (order.client && order.client.toLowerCase().includes(lowerCaseSearch)) ||
-        (order.representative && order.representative.toLowerCase().includes(lowerCaseSearch)) ||
+        (order.representative && order.representative.toLowerCase().includes(lowerCaseSearch)) || // Esta línea usa el ID
         (order.distributor && order.distributor.toLowerCase().includes(lowerCaseSearch)) ||
         (order.laboratory && order.laboratory.toLowerCase().includes(lowerCaseSearch)) ||
         (Array.isArray(order.items) && order.items.some(item => item.productName && item.productName.toLowerCase().includes(lowerCaseSearch)))
@@ -34,6 +34,7 @@ export default function ReportsView({ orders, onNavigate, sellers, distributors,
     }
 
     if (filterSeller) {
+      // FIX: Se filtra por el ID del vendedor, que debe coincidir con el campo 'representative'
       tempOrders = tempOrders.filter(order => order.representative === filterSeller);
     }
     if (filterDistributor) {
@@ -53,6 +54,8 @@ export default function ReportsView({ orders, onNavigate, sellers, distributors,
       end.setHours(23, 59, 59, 999);
       tempOrders = tempOrders.filter(order => new Date(order.date) <= end);
     }
+
+    tempOrders.sort((a, b) => new Date(b.date) - new Date(a.date));
 
     setFilteredOrders(tempOrders);
   }, [orders, searchTerm, filterSeller, filterDistributor, filterLaboratory, startDate, endDate, user]);
@@ -80,7 +83,7 @@ export default function ReportsView({ orders, onNavigate, sellers, distributors,
             <User className="text-gray-500 mr-3" />
             <select value={filterSeller} onChange={(e) => setFilterSeller(e.target.value)} className="w-full bg-transparent focus:outline-none">
               <option value="">Filtrar Vendedor</option>
-              {sellers.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+              {sellers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </div>
         )}
@@ -125,7 +128,7 @@ export default function ReportsView({ orders, onNavigate, sellers, distributors,
             </tr>
           </thead>
           <tbody>
-            {filteredOrders.slice().reverse().map((order) => (
+            {filteredOrders.map((order) => (
               <tr key={order.id} className="border-b hover:bg-gray-50">
                 <td className="p-3 text-sm">{new Date(order.date).toLocaleDateString()}</td>
                 <td className="p-3 font-medium">{order.client}</td>
@@ -149,4 +152,3 @@ export default function ReportsView({ orders, onNavigate, sellers, distributors,
     </div>
   );
 }
-
