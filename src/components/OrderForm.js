@@ -63,7 +63,7 @@ const ProductRow = ({ item, index, onUpdate, onRemove, productList, laboratory, 
         </div>
         {/* Bonus */}
         <div className="col-span-1 md:col-span-1">
-            <label htmlFor={`bonus-${index}`} className="block text-gray-700 text-xs font-semibold mb-1">Bonus</label>
+            <label htmlFor={`bonus-${index}`} className="block text-gray-700 text-xs font-semibold mb-1">Bonificación</label>
             <input id={`bonus-${index}`} type="number" placeholder="Bonus" value={item.bonus} onChange={(e) => handleInputChange("bonus", e.target.value)} className="w-full p-2 border rounded-md text-sm" />
         </div>
         {/* Precio Unitario */}

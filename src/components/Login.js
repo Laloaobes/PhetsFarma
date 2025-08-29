@@ -1,65 +1,70 @@
 import React, { useState } from 'react';
-import { auth, db } from '../firebase'; // Importa auth y db de tu archivo de configuración
-import { signInWithEmailAndPassword } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
 import { LogIn } from 'lucide-react';
+// 1. Importar las funciones necesarias de Firebase
+import { getAuth, signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
+import { db } from '../firebase';
+import { doc, getDoc } from "firebase/firestore";
 
+// 2. Aceptar la prop onLogin
 export default function Login({ onLogin }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setMessage('');
 
-    if (!email || !password) {
-      setError("Por favor, ingresa tu correo y contraseña.");
-      return;
-    }
-
+    const auth = getAuth();
     try {
-      // 1. Intenta iniciar sesión con el servicio de Autenticación de Firebase
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const authUser = userCredential.user;
+      const user = userCredential.user;
 
-      // 2. Si el login es exitoso, busca los datos adicionales (rol, nombre) en Firestore
-      const userDocRef = doc(db, "users", authUser.email); // Usa el email como ID para buscar
+      const userDocRef = doc(db, "users", user.email);
       const userDoc = await getDoc(userDocRef);
 
       if (userDoc.exists()) {
-        // 3. Combina los datos de Auth y Firestore y los envía a App.js
-        const userData = userDoc.data();
-        onLogin({
-          uid: authUser.uid,
-          email: authUser.email,
-          ...userData // Esto añade name, role, laboratory, etc.
-        });
+        // 3. ¡CORRECCIÓN! Llamar a onLogin con los datos del perfil del usuario
+        onLogin({ email: user.email, ...userDoc.data() });
       } else {
-        setError("No se encontraron datos de rol para este usuario.");
+        setError("No se encontraron datos de perfil para este usuario.");
+        auth.signOut();
       }
-
-    } catch (err) {
-      // Manejo de errores comunes de Firebase Auth
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-        setError("Correo o contraseña incorrectos.");
-      } else {
-        setError("Ocurrió un error al iniciar sesión.");
-        console.error(err);
-      }
+    } catch (error) {
+      setError("Email o contraseña incorrectos.");
     }
   };
+
+  const handlePasswordReset = async () => {
+    if (!email) {
+      setError("Por favor, ingresa tu email para restablecer la contraseña.");
+      return;
+    }
+    setError('');
+    setMessage('');
+
+    const auth = getAuth();
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setMessage("Se ha enviado un enlace para restablecer tu contraseña a tu correo.");
+    } catch (error) {
+      setError("No se pudo enviar el correo. Verifica que el email sea correcto.");
+    }
+  };
+
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
       <div className="w-full max-w-sm p-8 space-y-8 bg-white rounded-xl shadow-lg">
         <div className="text-center">
-          <img
-             src="/grupogarvo.png"
-            alt="Logo"
-            className="w-40 mx-auto mb-4"
-            onError={(e) => { e.currentTarget.src = "https://placehold.co/200x80?text=Logo"; }}
-          />
+            <img
+              src="/grupogarvo.png"
+              alt="Logo"
+              className="w-40 mx-auto mb-4"
+              onError={(e) => { e.currentTarget.src = "https://placehold.co/200x80?text=Logo"; }}
+            />
           <h1 className="text-2xl font-bold text-gray-800">Iniciar Sesión</h1>
           <p className="text-gray-500">Accede al sistema de pedidos</p>
         </div>
@@ -67,11 +72,11 @@ export default function Login({ onLogin }) {
           <div>
             <label className="text-sm font-bold text-gray-600 block">Correo Electrónico</label>
             <input
-              type="email" // Cambiado de 'text' a 'email'
+              type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full p-3 mt-1 text-gray-800 bg-gray-100 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="superadmin@test.com"
+              className="w-full p-3 mt-1 text-gray-800 bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="usuario@ejemplo.com"
               required
             />
           </div>
@@ -81,20 +86,33 @@ export default function Login({ onLogin }) {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full p-3 mt-1 text-gray-800 bg-gray-100 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full p-3 mt-1 text-gray-800 bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="••••••••"
               required
             />
           </div>
+
           {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+          {message && <p className="text-green-500 text-sm text-center">{message}</p>}
+
           <button
             type="submit"
-            className="w-full flex justify-center items-center bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 transition duration-300"
+            className="w-full flex justify-center items-center bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 transition"
           >
             <LogIn className="mr-2" size={20} />
             Acceder
           </button>
         </form>
+        
+        <div className="text-center">
+          <button
+            onClick={handlePasswordReset}
+            className="text-sm text-blue-600 hover:underline"
+          >
+            ¿Olvidaste tu contraseña?
+          </button>
+        </div>
+
       </div>
     </div>
   );

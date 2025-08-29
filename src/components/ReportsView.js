@@ -4,33 +4,32 @@ import { FileText, Search, FlaskConical, User, Truck } from 'lucide-react';
 export default function ReportsView({ orders, onNavigate, sellers, distributors, laboratories, user }) {
   const [filteredOrders, setFilteredOrders] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  
   const [filterSeller, setFilterSeller] = useState(user?.role === 'Vendedor' ? user.name : '');
   const [filterDistributor, setFilterDistributor] = useState('');
   const [filterLaboratory, setFilterLaboratory] = useState(user?.role === 'Gerente de laboratorio' ? user.laboratory : '');
+  
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
   useEffect(() => {
     let tempOrders = [...orders];
 
-    // Aplicar filtros por rol
     if (user) {
       if (user.role === 'Gerente de laboratorio' && user.laboratory) {
         tempOrders = tempOrders.filter(order => order.laboratory === user.laboratory);
       }
-      if (user.role === 'Vendedor' && user.name) {
-        tempOrders = tempOrders.filter(order => order.representative === user.name);
-      }
     }
 
-    // Aplicar filtros de búsqueda y selección
+    // --- CORRECCIÓN: Lógica de búsqueda más segura ---
     if (searchTerm) {
+      const lowerCaseSearch = searchTerm.toLowerCase();
       tempOrders = tempOrders.filter(order =>
-        order.client.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (order.representative && order.representative.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (order.distributor && order.distributor.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        order.laboratory.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        order.items.some(item => item.productName.toLowerCase().includes(searchTerm.toLowerCase()))
+        (order.client && order.client.toLowerCase().includes(lowerCaseSearch)) ||
+        (order.representative && order.representative.toLowerCase().includes(lowerCaseSearch)) ||
+        (order.distributor && order.distributor.toLowerCase().includes(lowerCaseSearch)) ||
+        (order.laboratory && order.laboratory.toLowerCase().includes(lowerCaseSearch)) ||
+        (Array.isArray(order.items) && order.items.some(item => item.productName && item.productName.toLowerCase().includes(lowerCaseSearch)))
       );
     }
 
@@ -116,20 +115,22 @@ export default function ReportsView({ orders, onNavigate, sellers, distributors,
         <table className="min-w-full bg-white">
           <thead>
             <tr className="bg-gray-100">
-              <th className="p-3 text-sm font-semibold text-gray-700">Fecha</th>
-              <th className="p-3 text-sm font-semibold text-gray-700">Cliente</th>
-              <th className="p-3 text-sm font-semibold text-gray-700">Vendedor</th>
-              <th className="p-3 text-sm font-semibold text-gray-700">Laboratorio</th>
+              <th className="p-3 text-sm font-semibold text-gray-700 text-left">Fecha</th>
+              <th className="p-3 text-sm font-semibold text-gray-700 text-left">Cliente</th>
+              <th className="p-3 text-sm font-semibold text-gray-700 text-left">Vendedor</th>
+              <th className="p-3 text-sm font-semibold text-gray-700 text-left">Distribuidor</th>
+              <th className="p-3 text-sm font-semibold text-gray-700 text-left">Laboratorio</th>
               <th className="p-3 text-sm font-semibold text-gray-700 text-right">Total</th>
               <th className="p-3 text-sm font-semibold text-gray-700 text-center">Acciones</th>
             </tr>
           </thead>
           <tbody>
-            {filteredOrders.map((order) => (
+            {filteredOrders.slice().reverse().map((order) => (
               <tr key={order.id} className="border-b hover:bg-gray-50">
                 <td className="p-3 text-sm">{new Date(order.date).toLocaleDateString()}</td>
                 <td className="p-3 font-medium">{order.client}</td>
-                <td className="p-3 text-sm">{order.representative}</td>
+                <td className="p-3 text-sm">{order.representative || 'N/A'}</td>
+                <td className="p-3 text-sm">{order.distributor || 'N/A'}</td>
                 <td className="p-3 text-sm">{order.laboratory}</td>
                 <td className="p-3 text-sm text-right font-semibold">${order.grandTotal.toFixed(2)}</td>
                 <td className="p-3 text-sm text-center">
@@ -148,3 +149,4 @@ export default function ReportsView({ orders, onNavigate, sellers, distributors,
     </div>
   );
 }
+
