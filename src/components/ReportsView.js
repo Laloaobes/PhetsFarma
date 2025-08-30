@@ -5,13 +5,18 @@ export default function ReportsView({ orders, onNavigate, sellers, distributors,
   const [filteredOrders, setFilteredOrders] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   
-  // FIX: Se usa el ID del usuario para filtrar, no el nombre
+  // Se usa el ID del usuario para filtrar, no el nombre
   const [filterSeller, setFilterSeller] = useState(user?.role === 'Vendedor' ? user.id : '');
   const [filterDistributor, setFilterDistributor] = useState('');
   const [filterLaboratory, setFilterLaboratory] = useState(user?.role === 'Gerente de laboratorio' ? user.laboratory : '');
   
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+
+  // Función de utilidad para formatear el total con separadores de miles
+  const formatTotal = (total) => {
+    return total.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
 
   useEffect(() => {
     let tempOrders = [...orders];
@@ -26,7 +31,7 @@ export default function ReportsView({ orders, onNavigate, sellers, distributors,
       const lowerCaseSearch = searchTerm.toLowerCase();
       tempOrders = tempOrders.filter(order =>
         (order.client && order.client.toLowerCase().includes(lowerCaseSearch)) ||
-        (order.representative && order.representative.toLowerCase().includes(lowerCaseSearch)) || // Esta línea usa el ID
+        (order.representative && order.representative.toLowerCase().includes(lowerCaseSearch)) ||
         (order.distributor && order.distributor.toLowerCase().includes(lowerCaseSearch)) ||
         (order.laboratory && order.laboratory.toLowerCase().includes(lowerCaseSearch)) ||
         (Array.isArray(order.items) && order.items.some(item => item.productName && item.productName.toLowerCase().includes(lowerCaseSearch)))
@@ -34,7 +39,6 @@ export default function ReportsView({ orders, onNavigate, sellers, distributors,
     }
 
     if (filterSeller) {
-      // FIX: Se filtra por el ID del vendedor, que debe coincidir con el campo 'representative'
       tempOrders = tempOrders.filter(order => order.representative === filterSeller);
     }
     if (filterDistributor) {
@@ -135,7 +139,7 @@ export default function ReportsView({ orders, onNavigate, sellers, distributors,
                 <td className="p-3 text-sm">{order.representative || 'N/A'}</td>
                 <td className="p-3 text-sm">{order.distributor || 'N/A'}</td>
                 <td className="p-3 text-sm">{order.laboratory}</td>
-                <td className="p-3 text-sm text-right font-semibold">${order.grandTotal.toFixed(2)}</td>
+                <td className="p-3 text-sm text-right font-semibold">${formatTotal(order.grandTotal)}</td>
                 <td className="p-3 text-sm text-center">
                   <button onClick={() => onNavigate('orderSummary', order)} className="text-blue-600 hover:text-blue-800 font-medium">
                     Ver Detalles

@@ -140,39 +140,69 @@ export default function App() {
     handleAddItem: async (newUser) => {
         // This logic should ideally call a Cloud Function to create the user in Auth
         try {
-            const userDocRef = doc(db, "users", newUser.email);
-            await setDoc(userDocRef, {
-                name: newUser.name,
-                username: newUser.username,
-                role: newUser.role,
-                laboratory: newUser.laboratory || ''
-            });
+          const userDocRef = doc(db, "users", newUser.email);
+          await setDoc(userDocRef, {
+            name: newUser.name,
+            username: newUser.username,
+            role: newUser.role,
+            laboratory: newUser.laboratory || ''
+          });
         } catch (error) {
-            console.error("Error adding user to Firestore: ", error);
+          console.error("Error adding user to Firestore: ", error);
         }
     },
     handleUpdateItem: async (updatedUser) => {
         try {
-            const userDocRef = doc(db, "users", updatedUser.id); // Assumes ID is the email
-            await updateDoc(userDocRef, {
-                name: updatedUser.name,
-                username: updatedUser.username,
-                role: updatedUser.role,
-                laboratory: updatedUser.laboratory || ''
-            });
+          const userDocRef = doc(db, "users", updatedUser.id); // Assumes ID is the email
+          await updateDoc(userDocRef, {
+            name: updatedUser.name,
+            username: updatedUser.username,
+            role: updatedUser.role,
+            laboratory: updatedUser.laboratory || ''
+          });
         } catch (error) {
-            console.error("Error updating user in Firestore: ", error);
+          console.error("Error updating user in Firestore: ", error);
         }
     },
     handleDeleteItem: async (userId) => {
         try {
-            // Ideally, a Cloud Function should also delete the user from Auth
-            await deleteDoc(doc(db, "users", userId));
+          // Ideally, a Cloud Function should also delete the user from Auth
+          await deleteDoc(doc(db, "users", userId));
         } catch (error) {
-            console.error("Error deleting user from Firestore: ", error);
+          console.error("Error deleting user from Firestore: ", error);
         }
     },
-};
+  };
+
+  // --- NUEVO OBJETO HANDLERS PARA PRODUCTOS LOCALES ---
+  const productHandlers = {
+    handleAddItem: (newItem) => {
+      setProducts(prevProducts => {
+        const labProducts = prevProducts[newItem.laboratory] ? [...prevProducts[newItem.laboratory]] : [];
+        return {
+          ...prevProducts,
+          [newItem.laboratory]: [...labProducts, newItem]
+        };
+      });
+    },
+    handleUpdateItem: (updatedItem) => {
+      setProducts(prevProducts => {
+        const labProducts = prevProducts[updatedItem.laboratory].map(product => 
+          product.code === updatedItem.code ? updatedItem : product
+        );
+        return {
+          ...prevProducts,
+          [updatedItem.laboratory]: labProducts
+        };
+      });
+    },
+    handleDeleteItem: (code, laboratory) => {
+      setProducts(prevProducts => ({
+        ...prevProducts,
+        [laboratory]: prevProducts[laboratory].filter(product => product.code !== code)
+      }));
+    }
+  };
   
   const renderView = () => {
     if (!user) {
@@ -208,7 +238,8 @@ export default function App() {
       case 'manageLaboratories':
         return <GenericManagement items={initialData.laboratories} handlers={genericHandlers('laboratories')} itemName="Laboratorio" user={user} />;
       case 'manageProducts':
-        return <ProductManagement products={products} laboratories={initialData.laboratories} user={user} />;
+        // Aquí se pasa el nuevo objeto 'productHandlers'
+        return <ProductManagement products={products} laboratories={initialData.laboratories} user={user} handlers={productHandlers} />;
       case 'manageUsers':
         return <UserManagement users={users} handlers={userHandlers} laboratories={initialData.laboratories} user={user} />;
       default:

@@ -55,6 +55,7 @@ export default function ProductManagement({ products, laboratories, handlers, us
 
   // Abre el modal para agregar un producto
   const openAddModal = () => {
+    // Se inicializa el precio como '0.00' (string)
     setCurrentProduct({ code: '', name: '', description: '', price: '0.00', laboratory: '' });
     setIsEditing(false); // Establecer isEditing a false para agregar
     setIsModalOpen(true);
@@ -80,7 +81,8 @@ export default function ProductManagement({ products, laboratories, handlers, us
   // Maneja la acción de guardar el producto
   const handleSave = (e) => {
     e.preventDefault();
-    if (!currentProduct.code || !currentProduct.name || !currentProduct.price || !currentProduct.laboratory) {
+    // Validación actualizada: ahora el precio puede ser 0
+    if (!currentProduct.code || !currentProduct.name || currentProduct.price === '' || !currentProduct.laboratory) {
       console.error('SKU, nombre, precio y laboratorio son obligatorios.');
       return;
     }
@@ -270,6 +272,7 @@ export default function ProductManagement({ products, laboratories, handlers, us
                 name="price"
                 value={currentProduct.price}
                 onChange={handleChange}
+                step="0.01"
                 className="w-full p-2.5 border border-gray-300 rounded-lg bg-white text-gray-800 focus:ring-blue-500 focus:border-blue-500"
                 required
                 disabled={!canEditProductPrice}
