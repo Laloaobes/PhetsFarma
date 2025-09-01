@@ -108,8 +108,14 @@ export const kironProducts = [
     { id: 106, code: "LKM149", name: "VIBIX C6R 10 ds", price: 2520.00, laboratory: "Kiron" },
     { id: 107, code: "LKM150", name: "VIBIX F3 10 ds", price: 1835.00, laboratory: "Kiron" },
     { id: 108, code: "LKM151", name: "VIBIX F3R 10 ds", price: 2460.00, laboratory: "Kiron" },
+    { id: 113, code: "PROMO3", name: "PROMO COMEDERO", price: 0.00, laboratory: "Kiron" },
     { id: 109, code: "LKM153", name: "SUCRAL GEL 15 GRMS", price: 305.00, laboratory: "Kiron" },
-    { id: 110, code: "LKM155", name: "SUCRAL SUSPENSION 60 ML", price: 215.00, laboratory: "Kiron" }
+    { id: 112, code: "PROMO2", name: "PROMO TIJERAS GROAMING 7.5", price: 0.00, laboratory: "Kiron" },
+    { id: 110, code: "LKM155", name: "SUCRAL SUSPENSION 60 ML", price: 215.00, laboratory: "Kiron" },
+    { id: 111, code: "PROMO1", name: "PROMO POSTER OFTAMOLOGIA", price: 0.00, laboratory: "Kiron" },
+    { id: 114, code: "PROMO13", name: "PROMO CARDA", price: 0.00, laboratory: "Kiron" },
+    { id: 115, code: "PROMO14", name: "PROMO CINCO DEDALES", price: 0.00, laboratory: "Kiron" },
+    { id: 116, code: "PROMO6", name: "PROMO HIELERA", price: 0.00, laboratory: "Kiron" },
 ];
 
 // Productos para Pets Pharma (actualizados)
@@ -219,7 +225,30 @@ export const petspharmaProducts = [
     { id: 105, code: "PET643", name: "GIARDIPET'S PLUS SUSPENSIÓN PERRO", price: 285.00, laboratory: "Pets Pharma" },
     { id: 106, code: "PET647", name: "BARBITHAL 100 ml", price: 2990.00, laboratory: "Pets Pharma" },
     { id: 107, code: "PET651", name: "LACTY-PET CAT 300 g", price: 440.00, laboratory: "Pets Pharma" },
-
+    { id: 108, code: "PROMO1", name: "PROMO PLATO DE ACERO INOXIDABLE", price: 0.00, laboratory: "Pets Pharma" },
+    { id: 109, code: "PROMO2", name: "PROMO MANDIL DE DERMAPETS", price: 0.00, laboratory: "Pets Pharma" },
+    { id: 110, code: "PROMO3", name: "PROMO COSMETIQUERA", price: 0.00, laboratory: "Pets Pharma" },
+    { id: 111, code: "PROMO4", name: "PROMO POSTER", price: 0.00, laboratory: "Pets Pharma" },
+    { id: 112, code: "PROMO5", name: "PROMO PROFESIONAL LIVE STREAM", price: 0.00, laboratory: "Pets Pharma" },
+    { id: 113, code: "PROMO6", name: "PROMO LIBRO DERMATOLOGICO", price: 0.00, laboratory: "Pets Pharma" },
+    { id: 114, code: "PROMO7", name: "PROMO CARDA", price: 0.00, laboratory: "Pets Pharma" },
+    { id: 115, code: "PROMO8", name: "PROMO TIRAS OFTALMOLOGICAS", price: 0.00, laboratory: "Pets Pharma" },
+    { id: 116, code: "PROMO9", name: "PROMO LONCHERA MARIO BROS", price: 0.00, laboratory: "Pets Pharma" },
+    { id: 117, code: "PROMO10", name: "PROMO TERMOMETRO DIGITAL RECTAL", price: 0.00, laboratory: "Pets Pharma" },
+    { id: 118, code: "PROMO11", name: "PROMO HAMACA DE ASEO MASCOTA", price: 0.00, laboratory: "Pets Pharma" },
+    { id: 119, code: "PROMO12", name: "PROMO MANUAL DE DERMATOLOGÍA CANINA Y FELINA", price: 0.00, laboratory: "Pets Pharma" },
+    { id: 120, code: "PROMO13", name: "PROMO MANUAL DE CITOLOGIA CLINICA", price: 0.00, laboratory: "Pets Pharma" },
+    { id: 121, code: "PROMO14", name: "PROMO MEDIDOR DE GLUCOSA Y CETONA CENTRIVET GK", price: 0.00, laboratory: "Pets Pharma" },
+    { id: 122, code: "PROMO15", name: "PROMO LAMPARA DE WOOB", price: 0.00, laboratory: "Pets Pharma" },
+    { id: 123, code: "PROMO16", name: "PROMO 3M LITTMANN ESTETOSCOPIO CLASSIC", price: 0.00, laboratory: "Pets Pharma" },
+    { id: 124, code: "PROMO17", name: "PROMO VIDEO OTOSCOPIO DIGITAL CON PANTALLA", price: 0.00, laboratory: "Pets Pharma" },
+    { id: 125, code: "PROMO18", name: "PROMO CONSOLA NINTENDO SWITCH LIFE", price: 0.00, laboratory: "Pets Pharma" },
+    { id: 126, code: "PROMO19", name: "PROMO MINI SPLIT", price: 0.00, laboratory: "Pets Pharma" },
+    { id: 127, code: "PROMO20", name: "PROMO SCOOTER S5", price: 0.00, laboratory: "Pets Pharma" },
+    { id: 128, code: "PROMO21", name: "PROMO MICROSCOPIO BINOCULAR PROFESIONAL", price: 0.00, laboratory: "Pets Pharma" },
+    { id: 129, code: "PROMO22", name: "PROMO BICICLETA S6 PROS", price: 0.00, laboratory: "Pets Pharma" },
+    { id: 130, code: "PROMO23", name: "PROMO MONITOR MULTIPLATAFORMA", price: 0.00, laboratory: "Pets Pharma" },
+    { id: 131, code: "PROMO24", name: "PROMO MICROSCOPIO TRINOCULAR CON OBJETIVOS", price: 0.00, laboratory: "Pets Pharma" } 
 ];
 
 export const vetsPharmaProducts = [
@@ -319,6 +348,12 @@ export const vetsPharmaProducts = [
     { id: 94, code: "PET695", name: "DERRINOVA SAD 30 ML", price: 387.00, laboratory: "Vets Pharma" },
     { id: 95, code: "PET700", name: "XILAPET 2% 25 ML", price: 690.00, laboratory: "Vets Pharma" },
     { id: 96, code: "PET711", name: "SUCRAL HORSE 30 GRMS", price: 34.92, laboratory: "Vets Pharma" },
-    { id: 97, code: "PET701", name: "IVERPLUS 1% 100 ML", price: 44.53, laboratory: "Vets Pharma" }
+    { id: 97, code: "PET701", name: "IVERPLUS 1% 100 ML", price: 44.53, laboratory: "Vets Pharma" },
+    { id: 98, code: "PROMO1", name: "PROMO TERMOMETRO DIGITAL RECTAL", price: 0.00, laboratory: "Vets Pharma" },
+    { id: 99, code: "PROMO2", name: "PROMO 3M LITTMANN ESTETOSCOPIO CLASSIC III", price: 0.00, laboratory: "Vets Pharma" },
+    { id: 100, code: "PROMO3", name: "PROMO CONSOLA NINTENDO SWITCH LITE", price: 0.00, laboratory: "Vets Pharma" },
+    { id: 101, code: "PROMO4", name: "PROMO SCOOTER S5", price: 0.00, laboratory: "Vets Pharma" },
+    { id: 102, code: "PROMO5", name: "PROMO BICICLETA S6 PROS", price: 0.00, laboratory: "Vets Pharma" },
+    { id: 103, code: "PROMO6", name: "PROMO MONITOR MULTIPARAMETRO", price: 0.00, laboratory: "Vets Pharma" },
 ];
 
