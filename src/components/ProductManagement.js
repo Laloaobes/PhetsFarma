@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Plus, Edit, Trash2, Package, X } from 'lucide-react';
+import { Plus, Edit, Trash2, Package, X, AlertTriangle } from 'lucide-react';
 
-// Componente para el modal
+// Componente genérico para modales
 const Modal = ({ onClose, title, children }) => (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
     <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md relative">
@@ -19,9 +19,13 @@ const Modal = ({ onClose, title, children }) => (
 export default function ProductManagement({ products, laboratories, handlers, user }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentProduct, setCurrentProduct] = useState(null);
-  const [isEditing, setIsEditing] = useState(false); // Nuevo estado para controlar si estamos editando
+  const [isEditing, setIsEditing] = useState(false);
   const [selectedLaboratory, setSelectedLaboratory] = useState('');
   const [filterText, setFilterText] = useState('');
+  
+  // --- MEJORA: Estados para el modal de confirmación de borrado ---
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [productToDelete, setProductToDelete] = useState(null);
 
   // Lógica de permisos de usuario
   const canAddProduct = user && ['Super Admin', 'Admin', 'Coordinador de vendedores', 'Gerente de laboratorio'].includes(user.role);
@@ -29,89 +33,74 @@ export default function ProductManagement({ products, laboratories, handlers, us
   const canEditProductPrice = user && ['Super Admin', 'Admin'].includes(user.role);
   const canDeleteProduct = user && ['Super Admin', 'Admin', 'Coordinador de vendedores'].includes(user.role);
 
-  // Unir todos los productos en un solo array para evitar duplicaciones
-  const allProducts = Object.values(products).flat();
-
-  // Filtrar productos por el laboratorio seleccionado y texto de búsqueda
-  const filteredProducts = allProducts.filter(product => {
-      const productLaboratoryName = product.laboratory?.toLowerCase() || '';
-      const filterLaboratoryName = selectedLaboratory?.toLowerCase() || '';
-      const filterLower = filterText.toLowerCase().trim();
-
-      const matchesLaboratory = filterLaboratoryName === '' || productLaboratoryName === filterLaboratoryName;
+  // Filtrar productos
+  const filteredProducts = products.filter(product => {
+      const matchesLaboratory = !selectedLaboratory || product.laboratory === selectedLaboratory;
+      const filterLower = filterText.toLowerCase();
+      const matchesFilterText = !filterLower || product.name.toLowerCase().includes(filterLower) || product.code.toLowerCase().includes(filterLower);
       
-      const matchesFilterText = filterText === '' ||
-                                (product.name?.toLowerCase().split(' ').some(word => word.startsWith(filterLower))) ||
-                                (String(product.code).toLowerCase().startsWith(filterLower));
+      if (user?.role === 'Gerente de laboratorio') {
+        return product.laboratory === user.laboratory && matchesFilterText;
+      }
       
       return matchesLaboratory && matchesFilterText;
-    })
-    .filter(product => {
-      if (user && user.role === 'Gerente de laboratorio') {
-        return product.laboratory === user.laboratory;
-      }
-      return true;
     });
 
-  // Abre el modal para agregar un producto
-  const openAddModal = () => {
-    // Se inicializa el precio como '0.00' (string)
-    setCurrentProduct({ code: '', name: '', description: '', price: '0.00', laboratory: '' });
-    setIsEditing(false); // Establecer isEditing a false para agregar
-    setIsModalOpen(true);
+  // --- Manejadores para el modal de borrado ---
+  const handleDeleteClick = (product) => {
+    setProductToDelete(product);
+    setIsDeleteConfirmOpen(true);
   };
 
-  // Abre el modal para editar un producto
-  const openEditModal = (product) => {
-    if (user && user.role === 'Gerente de laboratorio' && !canEditProductDetails) {
-        console.error('Como Gerente de laboratorio, solo puedes agregar productos, no editar los existentes.');
-        return;
+  const confirmDelete = () => {
+    if (productToDelete) {
+      // ¡LA CORRECCIÓN CLAVE! Se envía el 'id' del documento.
+      handlers.handleDeleteItem(productToDelete.id);
     }
-    setCurrentProduct(product);
-    setIsEditing(true); // Establecer isEditing a true para editar
+    setIsDeleteConfirmOpen(false);
+    setProductToDelete(null);
+  };
+
+  const cancelDelete = () => {
+    setIsDeleteConfirmOpen(false);
+    setProductToDelete(null);
+  };
+
+  // Manejadores para el modal de agregar/editar
+  const openAddModal = () => {
+    setCurrentProduct({ code: '', name: '', description: '', price: '0.00', laboratory: '' });
+    setIsEditing(false);
     setIsModalOpen(true);
   };
 
-  // Cierra el modal
+  const openEditModal = (product) => {
+    setCurrentProduct(product);
+    setIsEditing(true);
+    setIsModalOpen(true);
+  };
+
   const closeModal = () => {
     setIsModalOpen(false);
     setCurrentProduct(null);
   };
 
-  // Maneja la acción de guardar el producto
   const handleSave = (e) => {
     e.preventDefault();
-    // Validación actualizada: ahora el precio puede ser 0
-    if (!currentProduct.code || !currentProduct.name || currentProduct.price === '' || !currentProduct.laboratory) {
-      console.error('SKU, nombre, precio y laboratorio son obligatorios.');
+    if (!currentProduct.code || !currentProduct.name || !currentProduct.laboratory) {
+      alert('SKU, Nombre y Laboratorio son obligatorios.');
       return;
     }
-
-    if (isEditing && handlers.handleUpdateItem) {
-      if (canEditProductDetails) {
-        handlers.handleUpdateItem(currentProduct);
-      } else {
-        console.error('No tienes permiso para editar este producto.');
-      }
-    } else if (!isEditing && handlers.handleAddItem) {
-      if (canAddProduct) {
-        handlers.handleAddItem(currentProduct);
-      } else {
-        console.error('No tienes permiso para agregar productos.');
-      }
+    if (isEditing) {
+      handlers.handleUpdateItem(currentProduct);
+    } else {
+      handlers.handleAddItem(currentProduct);
     }
     closeModal();
   };
 
-  // Maneja los cambios en los inputs del formulario
   const handleChange = (e) => {
     const { name, value } = e.target;
-    // Check if the input name is 'code' and convert the value to uppercase
-    if (name === 'code') {
-      setCurrentProduct(prev => ({ ...prev, [name]: value.toUpperCase() }));
-    } else {
-      setCurrentProduct(prev => ({ ...prev, [name]: value }));
-    }
+    setCurrentProduct(prev => ({ ...prev, [name]: value }));
   };
 
   return (
@@ -128,75 +117,47 @@ export default function ProductManagement({ products, laboratories, handlers, us
       </div>
 
       {/* Filtros */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div>
-          <label htmlFor="filter-lab" className="block text-sm font-medium text-gray-700 mb-1">Filtrar por Laboratorio</label>
-          <select
-            id="filter-lab"
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <select
             value={selectedLaboratory}
             onChange={(e) => setSelectedLaboratory(e.target.value)}
-            className="w-full p-2.5 border border-gray-300 rounded-lg bg-white text-gray-800 focus:ring-blue-500 focus:border-blue-500"
-            disabled={user && user.role === 'Gerente de laboratorio'}
-          >
-            <option value="">Todos los Laboratorios</option>
-            {laboratories.map(lab => (
-              <option key={lab.id} value={lab.name}>{lab.name}</option>
-            ))} 
-          </select>
-        </div>
-        <div>
-          <label htmlFor="filter-text" className="block text-sm font-medium text-gray-700 mb-1">Buscar por Nombre o SKU</label>
-          <input
-            id="filter-text"
+            className="w-full p-2 border rounded-lg"
+            disabled={user?.role === 'Gerente de laboratorio'}
+        >
+          <option value="">Filtrar por Laboratorio</option>
+          {laboratories.map(lab => (<option key={lab.id} value={lab.name}>{lab.name}</option>))}
+        </select>
+        <input
             type="text"
             value={filterText}
             onChange={(e) => setFilterText(e.target.value)}
-            placeholder="Escribe para buscar..."
-            className="w-full p-2.5 border border-gray-300 rounded-lg bg-white text-gray-800 focus:ring-blue-500 focus:border-blue-500"
-          />
-        </div>
+            placeholder="Buscar por Nombre o SKU..."
+            className="w-full p-2 border rounded-lg"
+        />
       </div>
 
       <div className="overflow-x-auto">
         <table className="min-w-full text-left border-collapse">
           <thead className="bg-gray-100">
             <tr>
-              <th className="py-3 px-4 text-sm font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">SKU</th>
-              <th className="py-3 px-4 text-sm font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">Nombre</th>
-              <th className="py-3 px-4 text-sm font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">Descripción</th>
-              <th className="py-3 px-4 text-sm font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">Laboratorio</th>
-              <th className="py-3 px-4 text-sm font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200 text-right">Precio</th>
-              <th className="py-3 px-4 text-right text-sm font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">Acciones</th>
+              <th className="py-3 px-4 text-sm font-semibold text-gray-700">SKU</th>
+              <th className="py-3 px-4 text-sm font-semibold text-gray-700">Nombre</th>
+              <th className="py-3 px-4 text-sm font-semibold text-gray-700">Laboratorio</th>
+              <th className="py-3 px-4 text-sm font-semibold text-gray-700 text-right">Precio</th>
+              <th className="py-3 px-4 text-right text-sm font-semibold text-gray-700">Acciones</th>
             </tr>
           </thead>
           <tbody>
-            {filteredProducts.map((product, idx) => (
-              // Se usa 'product.code' como clave única para la lista
-              <tr key={product.code} className={`border-b border-gray-200 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition duration-150 ease-in-out`}>
+            {filteredProducts.map((product) => (
+              <tr key={product.id} className="border-b hover:bg-gray-50">
                 <td className="py-3 px-4 text-sm text-gray-800">{product.code}</td>
                 <td className="py-3 px-4 text-sm text-gray-800">{product.name}</td>
-                <td className="py-3 px-4 text-sm text-gray-800">{product.description}</td>
                 <td className="py-3 px-4 text-sm text-gray-800">{product.laboratory}</td>
-                <td className="py-3 px-4 text-sm text-gray-800 text-right">${parseFloat(product.price).toFixed(2)}</td>
-                <td className="py-3 px-4 text-right text-sm text-gray-800 space-x-2">
-                  {canEditProductDetails && (
-                    <button
-                      onClick={() => openEditModal(product)}
-                      className="text-blue-600 hover:text-blue-800 p-1.5 rounded-md hover:bg-blue-50 transition duration-150 ease-in-out"
-                    >
-                      <Edit size={18} />
-                    </button>
-                  )}
+                <td className="py-3 px-4 text-sm text-gray-800 text-right">${(parseFloat(product.price) || 0).toFixed(2)}</td>
+                <td className="py-3 px-4 text-right space-x-2">
+                  {canEditProductDetails && (<button onClick={() => openEditModal(product)} className="text-blue-600 hover:text-blue-800 p-1.5"><Edit size={18} /></button>)}
                   {canDeleteProduct && (
-                    <button
-                      onClick={() => handlers.handleDeleteItem(product.code, product.laboratory)}
-                      className="text-red-600 hover:text-red-800 p-1.5 rounded-md hover:bg-red-50 transition duration-150 ease-in-out"
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  )}
-                  {user && user.role === 'Gerente de laboratorio' && !canEditProductDetails && !canDeleteProduct && (
-                    <span className="text-gray-500 text-xs">Solo ver</span>
+                    <button onClick={() => handleDeleteClick(product)} className="text-red-600 hover:text-red-800 p-1.5"><Trash2 size={18} /></button>
                   )}
                 </td>
               </tr>
@@ -204,87 +165,53 @@ export default function ProductManagement({ products, laboratories, handlers, us
           </tbody>
         </table>
       </div>
-      {filteredProducts.length === 0 && (
-        <p className="text-center text-gray-500 mt-6 p-4 border rounded-lg bg-gray-50">No hay productos disponibles con los filtros actuales.</p>
-      )}
 
       {isModalOpen && (
         <Modal onClose={closeModal} title={isEditing ? 'Editar Producto' : 'Agregar Producto'}>
           <form onSubmit={handleSave} className="space-y-4">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">Laboratorio</label>
-              <select
-                name="laboratory"
-                value={currentProduct.laboratory}
-                onChange={handleChange}
-                className="w-full p-2.5 border border-gray-300 rounded-lg bg-white text-gray-800 focus:ring-blue-500 focus:border-blue-500"
-                required
-                disabled={user && user.role === 'Gerente de laboratorio' && isEditing}
-              >
+              <select name="laboratory" value={currentProduct.laboratory} onChange={handleChange} className="w-full p-2 border rounded-lg" required>
                 <option value="">Selecciona Laboratorio</option>
-                {laboratories
-                  .filter(lab => user && user.role === 'Gerente de laboratorio' ? lab.name === user.laboratory : true)
-                  .map(lab => (
-                    <option key={lab.id} value={lab.name}>{lab.name}</option>
-                  ))}
+                {laboratories.map(lab => (<option key={lab.id} value={lab.name}>{lab.name}</option>))}
               </select>
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">SKU</label>
-              <input
-                type="text"
-                name="code"
-                value={currentProduct.code}
-                onChange={handleChange}
-                className="w-full p-2.5 border border-gray-300 rounded-lg bg-white text-gray-800 focus:ring-blue-500 focus:border-blue-500"
-                required
-                // FIX: The SKU field is disabled only in editing mode.
-                disabled={isEditing}
-              />
+              <input type="text" name="code" value={currentProduct.code} onChange={handleChange} className="w-full p-2 border rounded-lg" required disabled={isEditing} />
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">Nombre del Producto</label>
-              <input
-                type="text"
-                name="name"
-                value={currentProduct.name}
-                onChange={handleChange}
-                className="w-full p-2.5 border border-gray-300 rounded-lg bg-white text-gray-800 focus:ring-blue-500 focus:border-blue-500"
-                required
-                disabled={isEditing && !canEditProductDetails && user.role === 'Gerente de laboratorio'}
-              />
+              <input type="text" name="name" value={currentProduct.name} onChange={handleChange} className="w-full p-2 border rounded-lg" required />
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">Descripción</label>
-              <textarea
-                name="description"
-                value={currentProduct.description}
-                onChange={handleChange}
-                rows="3"
-                className="w-full p-2.5 border border-gray-300 rounded-lg bg-white text-gray-800 focus:ring-blue-500 focus:border-blue-500"
-                disabled={isEditing && !canEditProductDetails && user.role === 'Gerente de laboratorio'}
-              ></textarea>
+              <textarea name="description" value={currentProduct.description} onChange={handleChange} rows="3" className="w-full p-2 border rounded-lg"></textarea>
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">Precio Unitario</label>
-              <input
-                type="number"
-                name="price"
-                value={currentProduct.price}
-                onChange={handleChange}
-                step="0.01"
-                className="w-full p-2.5 border border-gray-300 rounded-lg bg-white text-gray-800 focus:ring-blue-500 focus:border-blue-500"
-                required
-                disabled={!canEditProductPrice}
-              />
+              <input type="number" name="price" value={currentProduct.price} onChange={handleChange} step="0.01" className="w-full p-2 border rounded-lg" required disabled={!canEditProductPrice} />
             </div>
             <div className="flex justify-end space-x-3 mt-6">
-              <button type="button" onClick={closeModal} className="px-5 py-2.5 bg-gray-300 text-gray-800 font-semibold rounded-lg hover:bg-gray-400 transition duration-200 ease-in-out shadow-sm">Cancelar</button>
-              <button type="submit" className="px-5 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition duration-200 ease-in-out shadow-md">
-                {isEditing ? 'Guardar Cambios' : 'Agregar Producto'}
-              </button>
+              <button type="button" onClick={closeModal} className="px-5 py-2.5 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400">Cancelar</button>
+              <button type="submit" className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700">{isEditing ? 'Guardar Cambios' : 'Agregar Producto'}</button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {/* --- MEJORA: Modal de confirmación de borrado --- */}
+      {isDeleteConfirmOpen && (
+        <Modal onClose={cancelDelete} title="Confirmar Eliminación">
+            <div className='text-center'>
+                <AlertTriangle className="mx-auto h-12 w-12 text-red-500" />
+                <p className="mt-4 text-gray-700">¿Estás seguro de que quieres eliminar el producto <span className='font-bold'>{productToDelete?.name}</span>?</p>
+                <p className="text-sm text-gray-500">Esta acción no se puede deshacer.</p>
+                <div className="flex justify-center space-x-4 mt-6">
+                    <button onClick={cancelDelete} className="px-5 py-2.5 bg-gray-300 text-gray-800 font-semibold rounded-lg hover:bg-gray-400">Cancelar</button>
+                    <button onClick={confirmDelete} className="px-5 py-2.5 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700">Sí, eliminar</button>
+                </div>
+            </div>
         </Modal>
       )}
     </div>

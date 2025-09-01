@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+
+// Importa componentes de la aplicación
 // Importa componentes de la aplicación
 import AdminPanel from './components/AdminPanel';
 import OrderForm from './components/OrderForm';
@@ -13,10 +15,8 @@ import Login from './components/Login';
 import { db } from './firebase';
 import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, setDoc } from "firebase/firestore";
 
-// Se vuelve a importar la lista de productos local
-import { petspharmaProducts, kironProducts, vetsPharmaProducts } from './data/productList';
-
-// Datos locales que no se migrarán por ahora
+// --- DATOS LOCALES ---
+// Los laboratorios se mantienen como una lista fija y no se guardan en la base de datos.
 const initialData = {
   laboratories: [
     { id: 1, name: 'Pets Pharma' },
@@ -25,18 +25,12 @@ const initialData = {
   ]
 };
 
-// Se vuelve a definir la constante para los productos locales
-const initialProductsByLab = {
-  'Pets Pharma': petspharmaProducts,
-  'Kiron': kironProducts,
-  'Vets Pharma': vetsPharmaProducts
-};
-
 export default function App() {
   // Estados de la aplicación
   const [user, setUser] = useState(null);
   const [currentView, setCurrentView] = useState('login');
   const [lastView, setLastView] = useState('login');
+  const [currentOrder, setCurrentOrder] = useState(null);
   
   // ---- ESTADOS PARA DATOS DE FIRESTORE ----
   const [orders, setOrders] = useState([]);
@@ -44,10 +38,7 @@ export default function App() {
   const [representatives, setRepresentatives] = useState([]);
   const [distributors, setDistributors] = useState([]);
   const [users, setUsers] = useState([]);
-  
-  // El estado de productos ahora usa los datos locales de nuevo
-  const [products, setProducts] = useState(initialProductsByLab);
-  const [currentOrder, setCurrentOrder] = useState(null);
+  const [products, setProducts] = useState([]); 
 
   useEffect(() => {
     const savedUser = localStorage.getItem("salesUser");
@@ -59,13 +50,35 @@ export default function App() {
 
   // ---- LEER DATOS DESDE FIREBASE EN TIEMPO REAL ----
   useEffect(() => {
+    const unsubProducts = onSnapshot(collection(db, "products"), (snapshot) => setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
     const unsubClients = onSnapshot(collection(db, "clients"), (snapshot) => setClients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
     const unsubReps = onSnapshot(collection(db, "representatives"), (snapshot) => setRepresentatives(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
     const unsubDists = onSnapshot(collection(db, "distributors"), (snapshot) => setDistributors(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
-    const unsubOrders = onSnapshot(collection(db, "orders"), (snapshot) => setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), date: doc.data().date.toDate() }))));
     const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
+
+    // Listener para pedidos con la corrección de fechas
+    const unsubOrders = onSnapshot(collection(db, "orders"), (snapshot) => {
+      const fetchedOrders = snapshot.docs.map(doc => {
+        const data = doc.data();
+        let orderDate = new Date(); // Valor por defecto
+
+        if (data.date) {
+          if (typeof data.date.toDate === 'function') {
+            // Es un Timestamp de Firebase (pedidos nuevos)
+            orderDate = data.date.toDate();
+          } else if (typeof data.date === 'string') {
+            // Es un string (pedidos importados del JSON)
+            orderDate = new Date(data.date);
+          }
+        }
+        
+        return { id: doc.id, ...data, date: orderDate };
+      });
+      setOrders(fetchedOrders);
+    });
     
     return () => {
+      unsubProducts();
       unsubClients();
       unsubReps();
       unsubDists();
@@ -103,107 +116,79 @@ export default function App() {
     }
   };
 
+  // Handlers genéricos para gestionar Clientes, Vendedores, Distribuidores y Productos
   const genericHandlers = (key) => ({
     handleAddItem: async (item) => {
-      if (['clients', 'representatives', 'distributors'].includes(key)) {
-        try {
-          const { id, ...itemData } = item; 
-          await addDoc(collection(db, key), itemData);
-        } catch (error) {
-          console.error(`Error al añadir en ${key}: `, error);
+      try {
+        const { id, ...itemData } = item;
+        if (key === 'products') {
+          itemData.price = parseFloat(itemData.price) || 0;
         }
+        await addDoc(collection(db, key), itemData);
+      } catch (error) {
+        console.error(`Error al añadir en ${key}: `, error);
       }
     },
     handleUpdateItem: async (updatedItem) => {
-      if (['clients', 'representatives', 'distributors'].includes(key)) {
-        try {
-          const itemDoc = doc(db, key, updatedItem.id);
-          await updateDoc(itemDoc, { name: updatedItem.name });
-        } catch (error) {
-          console.error(`Error al actualizar en ${key}: `, error);
+      try {
+        const { id, ...itemData } = updatedItem;
+        if (key === 'products') {
+          itemData.price = parseFloat(itemData.price) || 0;
         }
+        const itemDoc = doc(db, key, id);
+        await updateDoc(itemDoc, itemData);
+      } catch (error) {
+        console.error(`Error al actualizar en ${key}: `, error);
       }
     },
     handleDeleteItem: async (id) => {
-      if (['clients', 'representatives', 'distributors'].includes(key)) {
-        try {
-          const itemDoc = doc(db, key, id);
-          await deleteDoc(itemDoc);
-        } catch (error) {
-          console.error(`Error al eliminar en ${key}: `, error);
-        }
+      try {
+        const itemDoc = doc(db, key, id);
+        await deleteDoc(itemDoc);
+      } catch (error) {
+        console.error(`Error al eliminar en ${key}: `, error);
       }
     },
   });
 
+  // Handlers específicos para la gestión de Usuarios
   const userHandlers = {
     handleAddItem: async (newUser) => {
-        // This logic should ideally call a Cloud Function to create the user in Auth
-        try {
-          const userDocRef = doc(db, "users", newUser.email);
-          await setDoc(userDocRef, {
-            name: newUser.name,
-            username: newUser.username,
-            role: newUser.role,
-            laboratory: newUser.laboratory || ''
-          });
-        } catch (error) {
-          console.error("Error adding user to Firestore: ", error);
-        }
+      try {
+        const userDocRef = doc(db, "users", newUser.email);
+        await setDoc(userDocRef, {
+          name: newUser.name,
+          username: newUser.username,
+          role: newUser.role,
+          laboratory: newUser.laboratory || ''
+        });
+      } catch (error) {
+        console.error("Error adding user to Firestore: ", error);
+      }
     },
     handleUpdateItem: async (updatedUser) => {
-        try {
-          const userDocRef = doc(db, "users", updatedUser.id); // Assumes ID is the email
-          await updateDoc(userDocRef, {
-            name: updatedUser.name,
-            username: updatedUser.username,
-            role: updatedUser.role,
-            laboratory: updatedUser.laboratory || ''
-          });
-        } catch (error) {
-          console.error("Error updating user in Firestore: ", error);
-        }
+      try {
+        const userDocRef = doc(db, "users", updatedUser.id);
+        await updateDoc(userDocRef, {
+          name: updatedUser.name,
+          username: updatedUser.username,
+          role: updatedUser.role,
+          laboratory: updatedUser.laboratory || ''
+        });
+      } catch (error) {
+        console.error("Error updating user in Firestore: ", error);
+      }
     },
     handleDeleteItem: async (userId) => {
-        try {
-          // Ideally, a Cloud Function should also delete the user from Auth
-          await deleteDoc(doc(db, "users", userId));
-        } catch (error) {
-          console.error("Error deleting user from Firestore: ", error);
-        }
+      try {
+        await deleteDoc(doc(db, "users", userId));
+      } catch (error) {
+        console.error("Error deleting user from Firestore: ", error);
+      }
     },
-  };
-
-  // --- NUEVO OBJETO HANDLERS PARA PRODUCTOS LOCALES ---
-  const productHandlers = {
-    handleAddItem: (newItem) => {
-      setProducts(prevProducts => {
-        const labProducts = prevProducts[newItem.laboratory] ? [...prevProducts[newItem.laboratory]] : [];
-        return {
-          ...prevProducts,
-          [newItem.laboratory]: [...labProducts, newItem]
-        };
-      });
-    },
-    handleUpdateItem: (updatedItem) => {
-      setProducts(prevProducts => {
-        const labProducts = prevProducts[updatedItem.laboratory].map(product => 
-          product.code === updatedItem.code ? updatedItem : product
-        );
-        return {
-          ...prevProducts,
-          [updatedItem.laboratory]: labProducts
-        };
-      });
-    },
-    handleDeleteItem: (code, laboratory) => {
-      setProducts(prevProducts => ({
-        ...prevProducts,
-        [laboratory]: prevProducts[laboratory].filter(product => product.code !== code)
-      }));
-    }
   };
   
+  // Función para renderizar la vista actual
   const renderView = () => {
     if (!user) {
       return <Login onLogin={handleLogin} users={users} />;
@@ -228,7 +213,7 @@ export default function App() {
       case 'orderSummary':
         return <OrderSummary order={currentOrder} onNavigate={handleNavigate} previousView={lastView} user={user} />;
       case 'reports':
-        return <Reports orders={orders} onNavigate={handleNavigate} sellers={representatives} distributors={distributors} laboratories={initialData.laboratories} user={user} />;
+        return <Reports orders={orders} products={products} onNavigate={handleNavigate} sellers={representatives} distributors={distributors} laboratories={initialData.laboratories} user={user} />;
       case 'manageClients':
         return <GenericManagement items={clients} handlers={genericHandlers('clients')} itemName="Cliente" user={user} />;
       case 'manageSellers':
@@ -236,10 +221,9 @@ export default function App() {
       case 'manageDistributors':
         return <GenericManagement items={distributors} handlers={genericHandlers('distributors')} itemName="Distribuidor" user={user} />;
       case 'manageLaboratories':
-        return <GenericManagement items={initialData.laboratories} handlers={genericHandlers('laboratories')} itemName="Laboratorio" user={user} />;
+        return <GenericManagement items={initialData.laboratories} handlers={{}} itemName="Laboratorio" user={user} isReadOnly={true} />;
       case 'manageProducts':
-        // Aquí se pasa el nuevo objeto 'productHandlers'
-        return <ProductManagement products={products} laboratories={initialData.laboratories} user={user} handlers={productHandlers} />;
+        return <ProductManagement products={products} laboratories={initialData.laboratories} user={user} handlers={genericHandlers('products')} />;
       case 'manageUsers':
         return <UserManagement users={users} handlers={userHandlers} laboratories={initialData.laboratories} user={user} />;
       default:

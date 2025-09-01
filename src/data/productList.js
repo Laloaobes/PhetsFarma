@@ -41,6 +41,7 @@ export const kironProducts = [
     { id: 39, code: "LKM057", name: "TOLTRAFIN 400 CJA DISPENS 10 BLIS/1TAB", price: 619.00, laboratory: "Kiron" },
     { id: 40, code: "LKM058", name: "GASTROZOL 5 14 TAB", price: 109.00, laboratory: "Kiron" },
     { id: 41, code: "LKM059", name: "GASTROZOL 20 14 TAB", price: 126.00, laboratory: "Kiron" },
+    {/*id: 41, code: "LKM059", name: "GASTROZOL 20 14 TAB",description: 'HOOLA A TODOS PEPEPEPPEPEPE', price: 126.00, laboratory: "Kiron"*/},
     { id: 42, code: "LKM060", name: "SECRETS ACTIVE 100 ML", price: 226.00, laboratory: "Kiron" },
     { id: 43, code: "LKM061", name: "SECRETS HOME 100 ML", price: 226.00, laboratory: "Kiron" },
     { id: 44, code: "LKM062", name: "MISTERY ACTIVE 100 ML", price: 226.00, laboratory: "Kiron" },
