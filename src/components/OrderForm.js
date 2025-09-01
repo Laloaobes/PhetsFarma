@@ -14,10 +14,13 @@ const formatNumber = (num) => {
 
 // El componente ProductRow
 const ProductRow = ({ item, index, onUpdate, onRemove, productList, laboratory, user, maxDiscountPercentage }) => {
-  const itemDiscountOptions = Array.from({ length: Math.floor(maxDiscountPercentage / 0.05) + 1 }, (_, i) => ({
-    label: `${(i * 5)}%`,
-    value: (i * 0.05)
-  }));
+  const itemDiscountOptions = Array.from(
+  { length: Math.floor((maxDiscountPercentage / 0.05) + 0.00001) + 1 }, // <-- truco del epsilon
+  (_, i) => ({
+    label: `${i * 5}%`,
+    value: i * 0.05,
+  })
+);
 
   const quantity = parseFloat(item.quantity) || 0;
   const price = parseFloat(item.price) || 0;
@@ -165,7 +168,7 @@ export default function OrderForm({
   const [modalMessage, setModalMessage] = useState("");
 
   const productsByLaboratory = products[laboratory] || [];
-  const maxDiscountAllowed = laboratory === 'Pets Pharma' ? 0.65 : (laboratory === 'Kiron' || laboratory === 'Vets Pharma' ? 0.35 : 0);
+  const maxDiscountAllowed = laboratory === 'Pets Pharma' ? 0.70 : (laboratory === 'Kiron' || laboratory === 'Vets Pharma' ? 0.70 : 0);
 
   useEffect(() => {
     let currentRawSubtotal = 0;
