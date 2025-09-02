@@ -76,7 +76,7 @@ export default function Login({ onLogin }) {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full p-3 mt-1 text-gray-800 bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="usuario@ejemplo.com"
+              
               required
             />
           </div>
@@ -87,7 +87,7 @@ export default function Login({ onLogin }) {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full p-3 mt-1 text-gray-800 bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="••••••••"
+        
               required
             />
           </div>
@@ -109,7 +109,7 @@ export default function Login({ onLogin }) {
             onClick={handlePasswordReset}
             className="text-sm text-blue-600 hover:underline"
           >
-            ¿Olvidaste tu contraseña?
+            
           </button>
         </div>
 

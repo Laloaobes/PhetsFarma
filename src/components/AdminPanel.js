@@ -33,7 +33,7 @@ export default function AdminPanel({ onNavigate, onLogout, currentView, user }) 
       <div className="container mx-auto flex flex-wrap items-center justify-between">
         {/* --- CAMBIO AQUÍ: LOGO AÑADIDO --- */}
         <div className="flex items-center space-x-4">
-          {user && <span className="text-sm italic ml-4 hidden md:inline">Bienvenido, {user.name} ({user.role})</span>}
+          {user && <span className="text-sm italic ml-4 hidden md:inline">Bienvenid@, {user.name} ({user.role})</span>}
         </div>
 
         <div className="flex-grow flex flex-col md:flex-row md:items-center md:justify-end mt-2 md:mt-0 w-full md:w-auto">
