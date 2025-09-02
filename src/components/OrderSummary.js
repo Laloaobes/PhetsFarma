@@ -1,7 +1,17 @@
 import React, { useState, useRef } from 'react';
-import { Printer, Share2, Plus, ArrowLeft, Download } from 'lucide-react';
+import { Printer, Share2, Plus, ArrowLeft } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+
+// Función de utilidad para formatear la moneda con separadores de miles
+const formatCurrency = (number) => {
+  return new Intl.NumberFormat('es-MX', {
+    style: 'currency',
+    currency: 'MXN',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(number);
+};
 
 // Componente para el diseño del PDF (se renderiza oculto)
 const PdfLayout = ({ order }) => {
@@ -58,8 +68,10 @@ const PdfLayout = ({ order }) => {
               <td className="text-center p-2">{item.quantity}</td>
               <td className="text-center p-2">{item.bonus || 0}</td>
               <td className="text-center p-2">{(parseFloat(item.discount) * 100).toFixed(0)}%</td>
-              <td className="text-right p-2">${parseFloat(item.price).toFixed(2)}</td>
-              <td className="text-right p-2 font-semibold">${parseFloat(item.total).toFixed(2)}</td>
+              {/* Se aplica formatCurrency a los precios unitarios */}
+              <td className="text-right p-2">{formatCurrency(item.price)}</td>
+              {/* Se aplica formatCurrency al total de cada ítem */}
+              <td className="text-right p-2 font-semibold">{formatCurrency(item.total)}</td>
             </tr>
           ))}
         </tbody>
@@ -67,19 +79,22 @@ const PdfLayout = ({ order }) => {
       <div className="flex justify-end mt-8">
         <div className="w-2/5">
           <div className="flex justify-between text-gray-700">
-              <span>Subtotal:</span>
-              <span>${order.subtotal.toFixed(2)}</span>
+            <span>Subtotal:</span>
+            {/* Se aplica formatCurrency al subtotal */}
+            <span>{formatCurrency(order.subtotal)}</span>
           </div>
           {/* --- CAMBIO AQUÍ: El descuento solo se muestra si es mayor a 0 --- */}
           {order.discountAmount > 0 && (
             <div className="flex justify-between text-red-600">
-                <span>Descuento:</span>
-                <span>-${order.discountAmount.toFixed(2)}</span>
+              <span>Descuento:</span>
+              {/* Se aplica formatCurrency al monto de descuento */}
+              <span>{formatCurrency(-order.discountAmount)}</span>
             </div>
           )}
           <div className="flex justify-between text-2xl font-bold border-t-2 border-gray-400 pt-2 mt-2">
             <span>Total:</span>
-            <span>${order.grandTotal.toFixed(2)}</span>
+            {/* Se aplica formatCurrency al total final */}
+            <span>{formatCurrency(order.grandTotal)}</span>
           </div>
         </div>
       </div>
@@ -145,13 +160,14 @@ export default function OrderSummary({ order, onNavigate, previousView }) {
     message += `Productos:\n`;
     order.items.forEach(item => {
       const bonusText = item.bonus > 0 ? ` (+${item.bonus} Bonificación)` : '';
-      message += `- ${item.productName} (Cant: ${item.quantity}${bonusText}) Total: $${parseFloat(item.total).toFixed(2)}\n`;
+      // Se usa la función de formato para los valores en el mensaje de WhatsApp
+      message += `- ${item.productName} (Cant: ${item.quantity}${bonusText}) Total: ${formatCurrency(item.total)}\n`;
     });
-    message += `\nSubtotal: $${order.subtotal.toFixed(2)}`;
+    message += `\nSubtotal: ${formatCurrency(order.subtotal)}`;
     if (order.discountAmount > 0) {
-      message += `\nDescuento: -$${order.discountAmount.toFixed(2)}`;
+      message += `\nDescuento: ${formatCurrency(-order.discountAmount)}`;
     }
-    message += `\nTotal Final: $${order.grandTotal.toFixed(2)}`;
+    message += `\nTotal Final: ${formatCurrency(order.grandTotal)}`;
 
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
@@ -197,9 +213,11 @@ export default function OrderSummary({ order, onNavigate, previousView }) {
               <div className="col-span-4 font-medium">{item.productName}</div>
               <div className="text-center">{item.quantity}</div>
               <div className="text-center">{item.bonus || 0}</div>
-              <div className="text-right">${parseFloat(item.price).toFixed(2)}</div>
+              {/* Se aplica formatCurrency a los precios unitarios */}
+              <div className="text-right">{formatCurrency(item.price)}</div>
               <div className="text-right">{(parseFloat(item.discount) * 100).toFixed(0)}%</div>
-              <div className="col-span-4 text-right font-semibold">${parseFloat(item.total).toFixed(2)}</div>
+              {/* Se aplica formatCurrency al total de cada ítem */}
+              <div className="col-span-4 text-right font-semibold">{formatCurrency(item.total)}</div>
             </div>
           ))}
         </div>
@@ -207,17 +225,20 @@ export default function OrderSummary({ order, onNavigate, previousView }) {
         <div className="flex flex-col items-end mt-6 space-y-1">
             <div className="flex justify-between w-full max-w-xs text-gray-600">
                 <span>Subtotal:</span>
-                <span>${order.subtotal.toFixed(2)}</span>
+                {/* Se aplica formatCurrency al subtotal */}
+                <span>{formatCurrency(order.subtotal)}</span>
             </div>
             {order.discountAmount > 0 && (
               <div className="flex justify-between w-full max-w-xs text-red-600">
                   <span>Descuento Aplicado:</span>
-                  <span>-${order.discountAmount.toFixed(2)}</span>
+                  {/* Se aplica formatCurrency al monto de descuento */}
+                  <span>{formatCurrency(-order.discountAmount)}</span>
               </div>
             )}
             <div className="flex justify-between w-full max-w-xs text-gray-800 text-2xl font-bold border-t pt-2 mt-2">
                 <span>Total:</span>
-                <span>${order.grandTotal.toFixed(2)}</span>
+                {/* Se aplica formatCurrency al total final */}
+                <span>{formatCurrency(order.grandTotal)}</span>
             </div>
         </div>
 
