@@ -1,0 +1,11 @@
+# Forzar LF en código JS/TS/React
+*.js text eol=lf
+*.ts text eol=lf
+*.jsx text eol=lf
+*.tsx text eol=lf
+
+# Ignorar cambios de finales de línea en Android
+android/** -text
+
+# Ignorar cambios en capacitor.config.ts
+capacitor.config.ts -text
