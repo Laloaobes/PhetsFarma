@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Edit, Trash2, User as UserIcon } from 'lucide-react';
+import { Plus, Edit, Trash2, User as UserIcon, X } from 'lucide-react';
 
 export default function UserManagement({ users, handlers, laboratories, user: loggedInUser }) {
   const [editingUser, setEditingUser] = useState(null);
@@ -27,7 +27,6 @@ export default function UserManagement({ users, handlers, laboratories, user: lo
 
   const handleEditClick = (u) => {
     setEditingUser(u);
-    // Cargar los datos del usuario para editar. El ID de Firestore es el email.
     setNewUser({ 
       id: u.id, 
       email: u.id, 
@@ -35,25 +34,25 @@ export default function UserManagement({ users, handlers, laboratories, user: lo
       username: u.username, 
       role: u.role, 
       laboratory: u.laboratory,
-      password: '' // La contraseña no se muestra al editar por seguridad
+      password: ''
     });
   };
 
   const handleSaveUser = () => {
-    if (editingUser) { // Lógica para actualizar
+    if (editingUser) {
       if (!newUser.name || !newUser.role) {
         alert('Nombre y Rol son obligatorios para actualizar.');
         return;
       }
       handlers.handleUpdateItem(newUser);
-    } else { // Lógica para crear
+    } else {
       if (!newUser.email || !newUser.password || !newUser.name || !newUser.role) {
         alert('Email, Contraseña, Nombre y Rol son obligatorios.');
         return;
       }
       handlers.handleAddItem(newUser);
     }
-    handleCancelEdit(); // Limpiar formulario
+    handleCancelEdit();
   };
 
   const handleCancelEdit = () => {
@@ -109,8 +108,9 @@ export default function UserManagement({ users, handlers, laboratories, user: lo
               {availableRoles.map(role => (<option key={role} value={role}>{role}</option>))}
             </select>
           </div>
-          {/* Laboratorio (condicional) */}
-          {newUser.role === 'Gerente de laboratorio' && (
+          {/* --- ¡AQUÍ ESTÁ LA CORRECCIÓN! --- */}
+          {/* El campo de laboratorio ahora aparece para Gerentes Y Vendedores. */}
+          {['Gerente de laboratorio', 'Vendedor'].includes(newUser.role) && (
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">Laboratorio Asignado</label>
               <select name="laboratory" value={newUser.laboratory} onChange={handleChange} className="w-full p-2.5 border rounded-lg" required>

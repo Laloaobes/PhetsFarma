@@ -10,13 +10,12 @@ const formatNumber = (num) => {
   });
 };
 
-// Componente de búsqueda de productos
+// --- COMPONENTE DE BÚSQUEDA DE PRODUCTOS ---
 const ProductSearchSelect = ({ products, onSelect, disabled, value }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const wrapperRef = useRef(null);
 
-  // ¡MEJORA! Se añade .sort() para que la lista de productos siempre esté ordenada alfabéticamente.
   const filteredProducts = (searchTerm
     ? products.filter(product => product.name.toLowerCase().includes(searchTerm.toLowerCase()))
     : products
@@ -79,7 +78,7 @@ const ProductSearchSelect = ({ products, onSelect, disabled, value }) => {
   );
 };
 
-// Componente para cada fila de producto en el formulario.
+// El componente ProductRow
 const ProductRow = ({ item, index, onUpdate, onRemove, productList, laboratory }) => {
   const maxDiscountPercentage = 0.70;
 
@@ -104,15 +103,16 @@ const ProductRow = ({ item, index, onUpdate, onRemove, productList, laboratory }
 
     if (product) {
       const selectedPrice = parseFloat(product.price) || 0;
-      const currentQuantity = parseFloat(item.quantity) || 1;
-      const currentDiscount = parseFloat(item.discount) || 0;
-      const newTotal = (currentQuantity * selectedPrice * (1 - currentDiscount)).toFixed(2);
+      const newTotal = (1 * selectedPrice * (1 - 0)).toFixed(2); // Cant 1, Desc 0
       
       updatedItem = { 
         ...item, 
         sku: product.code, 
         productName: product.name, 
         price: selectedPrice.toFixed(2),
+        quantity: '1',
+        bonus: '0',
+        discount: '0',
         total: newTotal 
       };
     } else {
@@ -139,29 +139,29 @@ const ProductRow = ({ item, index, onUpdate, onRemove, productList, laboratory }
           <span className="font-medium text-sm">{item.sku || 'N/A'}</span>
         </div>
         <div className="col-span-1 md:col-span-3">
-          <label htmlFor={`product-${index}`} className="block text-gray-700 text-xs font-semibold mb-1">Producto</label>
-          <ProductSearchSelect
-            products={productList}
-            value={item.productName}
-            onSelect={handleProductSelect}
+          <label className="block text-gray-700 text-xs font-semibold mb-1">Producto</label>
+          <ProductSearchSelect 
+            products={productList} 
+            value={item.productName} 
+            onSelect={handleProductSelect} 
             disabled={!laboratory}
           />
         </div>
         <div className="col-span-1 md:col-span-1">
-          <label htmlFor={`quantity-${index}`} className="block text-gray-700 text-xs font-semibold mb-1">Cant.</label>
-          <input id={`quantity-${index}`} type="number" placeholder="Cant." value={item.quantity} onChange={(e) => handleInputChange("quantity", e.target.value)} className="w-full p-2 border rounded-md text-sm" />
+          <label className="block text-gray-700 text-xs font-semibold mb-1">Cant.</label>
+          <input type="number" value={item.quantity} onChange={(e) => handleInputChange("quantity", e.target.value)} className="w-full p-2 border rounded-md text-sm" />
         </div>
         <div className="col-span-1 md:col-span-1">
-          <label htmlFor={`bonus-${index}`} className="block text-gray-700 text-xs font-semibold mb-1">Bonificación</label>
-          <input id={`bonus-${index}`} type="number" placeholder="Bonus" value={item.bonus} onChange={(e) => handleInputChange("bonus", e.target.value)} className="w-full p-2 border rounded-md text-sm" />
+          <label className="block text-gray-700 text-xs font-semibold mb-1">Bonificación</label>
+          <input type="number" value={item.bonus} onChange={(e) => handleInputChange("bonus", e.target.value)} className="w-full p-2 border rounded-md text-sm" />
         </div>
         <div className="col-span-1 md:col-span-2 text-right">
           <label className="block text-gray-700 text-xs font-semibold mb-1">Precio Unit.</label>
           <span className="font-medium text-gray-800 p-2 bg-gray-100 border rounded-md w-full text-sm inline-block">${formatNumber(item.price)}</span>
         </div>
         <div className="col-span-1 md:col-span-1">
-          <label htmlFor={`discount-${index}`} className="block text-gray-700 text-xs font-semibold mb-1">Desc. (%)</label>
-          <select id={`discount-${index}`} value={item.discount} onChange={(e) => handleInputChange("discount", parseFloat(e.target.value))} className="w-full p-2 border rounded-md bg-white text-sm">
+          <label className="block text-gray-700 text-xs font-semibold mb-1">Desc. (%)</label>
+          <select value={item.discount} onChange={(e) => handleInputChange("discount", parseFloat(e.target.value))} className="w-full p-2 border rounded-md bg-white text-sm">
             {itemDiscountOptions.map((option, idx) => (<option key={idx} value={option.value}>{option.label}</option>))}
           </select>
         </div>
@@ -194,14 +194,12 @@ export default function OrderForm({
   onSaveNewRepresentative,
   onSaveNewDistributor
 }) {
-  // Estados generales del formulario
-  const [laboratory, setLaboratory] = useState(user?.role === 'Gerente de laboratorio' ? user.laboratory : "");
+  const [laboratory, setLaboratory] = useState((user?.role === 'Gerente de laboratorio' || user?.role === 'Vendedor') ? user.laboratory : "");
   const [representative, setRepresentative] = useState(user?.role === 'Vendedor' ? user.name : "");
   const [distributor, setDistributor] = useState("");
   const [client, setClient] = useState("");
   const [items, setItems] = useState([{ sku: "", productName: "", quantity: "1", bonus: "0", price: "0.00", discount: "0", total: "0.00" }]);
   
-  // Estados para la funcionalidad de agregar nuevos clientes, vendedores, etc.
   const [isAddingNewClient, setIsAddingNewClient] = useState(false);
   const [newClientName, setNewClientName] = useState("");
   const [clientToSelectAfterAdd, setClientToSelectAfterAdd] = useState(null);
@@ -214,7 +212,6 @@ export default function OrderForm({
   const [newDistName, setNewDistName] = useState("");
   const [distToSelectAfterAdd, setDistToSelectAfterAdd] = useState(null);
   
-  // Estado para el modal de alerta
   const [showModal, setShowModal] = useState(false);
   const [modalMessage, setModalMessage] = useState("");
 
@@ -344,17 +341,22 @@ export default function OrderForm({
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div className="flex flex-col bg-gray-100 p-3 rounded-lg">
-                <label htmlFor="laboratory-select" className="block text-gray-700 text-xs font-semibold mb-1">Laboratorio</label>
+                <label className="block text-gray-700 text-xs font-semibold mb-1">Laboratorio</label>
                 <div className="flex items-center">
                     <FlaskConical className="text-gray-500 mr-3" />
-                    <select id="laboratory-select" value={laboratory} onChange={(e) => setLaboratory(e.target.value)} className="w-full bg-transparent focus:outline-none" disabled={user?.role === 'Gerente de laboratorio'}>
+                    <select 
+                      value={laboratory} 
+                      onChange={(e) => setLaboratory(e.target.value)} 
+                      className="w-full bg-transparent focus:outline-none" 
+                      disabled={user?.role === 'Gerente de laboratorio' || user?.role === 'Vendedor'}
+                    >
                         <option value="">Selecciona Laboratorio</option>
                         {laboratories.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}
                     </select>
                 </div>
             </div>
             <div className="flex flex-col bg-gray-100 p-3 rounded-lg">
-                <label htmlFor="representative-select" className="block text-gray-700 text-xs font-semibold mb-1">Vendedor</label>
+                <label className="block text-gray-700 text-xs font-semibold mb-1">Vendedor</label>
                 <div className="flex items-center">
                   <UserIcon className="text-gray-500 mr-3" />
                   {isAddingNewRep ? (
@@ -365,19 +367,23 @@ export default function OrderForm({
                     </div>
                   ) : (
                     <>
-                      <select id="representative-select" value={representative} onChange={(e) => setRepresentative(e.target.value)} className="w-full bg-transparent focus:outline-none" disabled={user?.role === 'Vendedor'}>
-                          <option value="">Selecciona Vendedor</option>
-                          {sortedRepresentatives.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
-                      </select>
-                      { user?.role !== 'Vendedor' && 
-                        <button onClick={handleToggleNewRep} className="ml-2 p-1.5 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200" title="Añadir nuevo vendedor"><Plus size={20} /></button>
-                      }
+                      { user?.role === 'Vendedor' ? (
+                          <span className="w-full bg-transparent focus:outline-none">{representative}</span>
+                      ) : (
+                        <>
+                          <select value={representative} onChange={(e) => setRepresentative(e.target.value)} className="w-full bg-transparent focus:outline-none">
+                              <option value="">Selecciona Vendedor</option>
+                              {sortedRepresentatives.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
+                          </select>
+                          <button onClick={handleToggleNewRep} className="ml-2 p-1.5 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200" title="Añadir nuevo vendedor"><Plus size={20} /></button>
+                        </>
+                      )}
                     </>
                   )}
                 </div>
             </div>
             <div className="flex flex-col bg-gray-100 p-3 rounded-lg">
-                <label htmlFor="distributor-select" className="block text-gray-700 text-xs font-semibold mb-1">Distribuidor</label>
+                <label className="block text-gray-700 text-xs font-semibold mb-1">Distribuidor</label>
                  <div className="flex items-center">
                   <Truck className="text-gray-500 mr-3" />
                   {isAddingNewDist ? (
@@ -388,7 +394,7 @@ export default function OrderForm({
                     </div>
                   ) : (
                     <>
-                      <select id="distributor-select" value={distributor} onChange={(e) => setDistributor(e.target.value)} className="w-full bg-transparent focus:outline-none">
+                      <select value={distributor} onChange={(e) => setDistributor(e.target.value)} className="w-full bg-transparent focus:outline-none">
                           <option value="">Selecciona Distribuidor</option>
                           {sortedDistributors.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
                       </select>
@@ -398,7 +404,7 @@ export default function OrderForm({
                 </div>
             </div>
             <div className="flex flex-col bg-gray-100 p-3 rounded-lg">
-                <label htmlFor="client-select" className="block text-gray-700 text-xs font-semibold mb-1">Cliente *</label>
+                <label className="block text-gray-700 text-xs font-semibold mb-1">Cliente *</label>
                 <div className="flex items-center">
                   <UserIcon className="text-gray-500 mr-3" size={18} />
                   {isAddingNewClient ? (
@@ -409,7 +415,7 @@ export default function OrderForm({
                     </div>
                   ) : (
                     <>
-                      <select id="client-select" value={client} onChange={(e) => setClient(e.target.value)} className="w-full bg-transparent focus:outline-none text-sm" required>
+                      <select value={client} onChange={(e) => setClient(e.target.value)} className="w-full bg-transparent focus:outline-none text-sm" required>
                           <option value="">Selecciona Cliente</option>
                           {sortedClients.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                       </select>
