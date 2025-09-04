@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
 // Importa componentes de la aplicación
-// Importa componentes de la aplicación
 import AdminPanel from './components/AdminPanel';
 import OrderForm from './components/OrderForm';
 import OrderSummary from './components/OrderSummary';
@@ -213,7 +212,16 @@ export default function App() {
       case 'orderSummary':
         return <OrderSummary order={currentOrder} onNavigate={handleNavigate} previousView={lastView} user={user} />;
       case 'reports':
-        return <Reports orders={orders} products={products} onNavigate={handleNavigate} sellers={representatives} distributors={distributors} laboratories={initialData.laboratories} user={user} />;
+        return <Reports 
+                  orders={orders} 
+                  onNavigate={handleNavigate} 
+                  users={users} 
+                  distributors={distributors} 
+                  laboratories={initialData.laboratories} 
+                  user={user} 
+                  onDeleteOrder={genericHandlers('orders').handleDeleteItem} 
+                  representatives={representatives}
+                />;
       case 'manageClients':
         return <GenericManagement items={clients} handlers={genericHandlers('clients')} itemName="Cliente" user={user} />;
       case 'manageSellers':

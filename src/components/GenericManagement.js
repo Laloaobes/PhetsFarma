@@ -185,4 +185,3 @@ export default function GenericManagement({ items, handlers, itemName, user }) {
     </>
   );
 }
-
