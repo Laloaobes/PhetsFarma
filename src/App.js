@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Toaster } from 'react-hot-toast'; // <-- 1. IMPORTAMOS TOASTER
+import { Toaster } from 'react-hot-toast';
 
 // Importa componentes de la aplicación
 import AdminPanel from './components/AdminPanel';
@@ -32,7 +32,7 @@ export default function App() {
   const [currentOrder, setCurrentOrder] = useState(null);
   
   // ---- ESTADOS PARA DATOS DE FIRESTORE ----
-  const [orders, setOrders] = useState([]);
+  // Se ha eliminado el estado 'orders' de aquí
   const [clients, setClients] = useState([]);
   const [representatives, setRepresentatives] = useState([]);
   const [distributors, setDistributors] = useState([]);
@@ -48,6 +48,7 @@ export default function App() {
   }, []);
 
   // ---- LEER DATOS DESDE FIREBASE EN TIEMPO REAL ----
+  // Se ha eliminado la carga de 'orders' de este efecto
   useEffect(() => {
     const unsubProducts = onSnapshot(collection(db, "products"), (snapshot) => setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
     const unsubClients = onSnapshot(collection(db, "clients"), (snapshot) => setClients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
@@ -55,28 +56,11 @@ export default function App() {
     const unsubDists = onSnapshot(collection(db, "distributors"), (snapshot) => setDistributors(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
     const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
 
-    const unsubOrders = onSnapshot(collection(db, "orders"), (snapshot) => {
-      const fetchedOrders = snapshot.docs.map(doc => {
-        const data = doc.data();
-        let orderDate = new Date();
-        if (data.date) {
-          if (typeof data.date.toDate === 'function') {
-            orderDate = data.date.toDate();
-          } else if (typeof data.date === 'string') {
-            orderDate = new Date(data.date);
-          }
-        }
-        return { id: doc.id, ...data, date: orderDate };
-      });
-      setOrders(fetchedOrders);
-    });
-    
     return () => {
       unsubProducts();
       unsubClients();
       unsubReps();
       unsubDists();
-      unsubOrders();
       unsubUsers();
     };
   }, []);
@@ -180,6 +164,7 @@ export default function App() {
     },
   };
   
+  // --- Renderizado de Vistas ---
   const renderView = () => {
     if (!user) {
       return <Login onLogin={handleLogin} users={users} />;
@@ -204,8 +189,8 @@ export default function App() {
       case 'orderSummary':
         return <OrderSummary order={currentOrder} onNavigate={handleNavigate} previousView={lastView} user={user} />;
       case 'reports':
+        // ReportsView ya no recibe 'orders', es autosuficiente
         return <Reports 
-                  orders={orders} 
                   onNavigate={handleNavigate} 
                   users={users} 
                   distributors={distributors} 
@@ -225,7 +210,7 @@ export default function App() {
       case 'manageProducts':
         return <ProductManagement products={products} laboratories={initialData.laboratories} user={user} handlers={genericHandlers('products')} />;
       case 'manageUsers':
-        return <UserManagement user={user} />; // <--- Pasamos el usuario logueado
+        return <UserManagement user={user} />;
       default:
         return <div>Vista no encontrada</div>;
     }
@@ -233,7 +218,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
-      {/* <-- 2. AÑADIMOS EL COMPONENTE TOASTER AQUÍ --> */}
       <Toaster 
         position="top-right"
         toastOptions={{
