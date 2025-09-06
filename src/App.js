@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Toaster } from 'react-hot-toast'; // <-- 1. IMPORTAMOS TOASTER
 
 // Importa componentes de la aplicación
 import AdminPanel from './components/AdminPanel';
@@ -15,7 +16,6 @@ import { db } from './firebase';
 import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, setDoc } from "firebase/firestore";
 
 // --- DATOS LOCALES ---
-// Los laboratorios se mantienen como una lista fija y no se guardan en la base de datos.
 const initialData = {
   laboratories: [
     { id: 1, name: 'Pets Pharma' },
@@ -55,22 +55,17 @@ export default function App() {
     const unsubDists = onSnapshot(collection(db, "distributors"), (snapshot) => setDistributors(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
     const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
 
-    // Listener para pedidos con la corrección de fechas
     const unsubOrders = onSnapshot(collection(db, "orders"), (snapshot) => {
       const fetchedOrders = snapshot.docs.map(doc => {
         const data = doc.data();
-        let orderDate = new Date(); // Valor por defecto
-
+        let orderDate = new Date();
         if (data.date) {
           if (typeof data.date.toDate === 'function') {
-            // Es un Timestamp de Firebase (pedidos nuevos)
             orderDate = data.date.toDate();
           } else if (typeof data.date === 'string') {
-            // Es un string (pedidos importados del JSON)
             orderDate = new Date(data.date);
           }
         }
-        
         return { id: doc.id, ...data, date: orderDate };
       });
       setOrders(fetchedOrders);
@@ -115,7 +110,6 @@ export default function App() {
     }
   };
 
-  // Handlers genéricos para gestionar Clientes, Vendedores, Distribuidores y Productos
   const genericHandlers = (key) => ({
     handleAddItem: async (item) => {
       try {
@@ -150,7 +144,6 @@ export default function App() {
     },
   });
 
-  // Handlers específicos para la gestión de Usuarios
   const userHandlers = {
     handleAddItem: async (newUser) => {
       try {
@@ -187,7 +180,6 @@ export default function App() {
     },
   };
   
-  // Función para renderizar la vista actual
   const renderView = () => {
     if (!user) {
       return <Login onLogin={handleLogin} users={users} />;
@@ -233,7 +225,7 @@ export default function App() {
       case 'manageProducts':
         return <ProductManagement products={products} laboratories={initialData.laboratories} user={user} handlers={genericHandlers('products')} />;
       case 'manageUsers':
-        return <UserManagement users={users} handlers={userHandlers} laboratories={initialData.laboratories} user={user} />;
+        return <UserManagement user={user} />; // <--- Pasamos el usuario logueado
       default:
         return <div>Vista no encontrada</div>;
     }
@@ -241,6 +233,14 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
+      {/* <-- 2. AÑADIMOS EL COMPONENTE TOASTER AQUÍ --> */}
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 3000, // La notificación dura 3 segundos
+        }}
+      />
+      
       {user && currentView !== 'login' && (
         <AdminPanel onNavigate={handleNavigate} onLogout={handleLogout} currentView={currentView} user={user} />
       )}

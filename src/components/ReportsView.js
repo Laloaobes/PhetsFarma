@@ -1,5 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { FileText, Search, FlaskConical, User, Truck, DollarSign, Hash, Calendar as CalendarIcon, Printer, Trash2 } from 'lucide-react';
+import { 
+    FileText, 
+    Search, 
+    FlaskConical, 
+    User, 
+    Truck, 
+    DollarSign, 
+    Hash, 
+    Calendar as CalendarIcon, 
+    Printer, 
+    Trash2,
+    Loader2 
+} from 'lucide-react';
 
 // --- Sub-componentes de UI ---
 
@@ -202,6 +214,12 @@ export default function ReportsView({ orders, onNavigate, users, distributors, l
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
+  // Estados para la carga progresiva
+  const ORDERS_TO_LOAD = 25;
+  const [displayedOrders, setDisplayedOrders] = useState([]);
+  const [visibleCount, setVisibleCount] = useState(ORDERS_TO_LOAD);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
   const sortedSellers = useMemo(() => 
     [...representatives].sort((a, b) => a.name.localeCompare(b.name)),
   [representatives]);
@@ -216,6 +234,7 @@ export default function ReportsView({ orders, onNavigate, users, distributors, l
     return total.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
   };
 
+  // Efecto principal para filtrar los pedidos
   useEffect(() => {
     let tempOrders = [...orders];
     
@@ -259,6 +278,17 @@ export default function ReportsView({ orders, onNavigate, users, distributors, l
     setFilteredOrders(tempOrders);
   }, [orders, searchTerm, filterSeller, filterDistributor, filterLaboratory, startDate, endDate, user, representatives]);
 
+  // Efecto para reiniciar la vista cuando cambian los filtros
+  useEffect(() => {
+    setVisibleCount(ORDERS_TO_LOAD);
+    setDisplayedOrders(filteredOrders.slice(0, ORDERS_TO_LOAD));
+  }, [filteredOrders]);
+
+  // Efecto para actualizar los pedidos visibles cuando se carga más
+  useEffect(() => {
+    setDisplayedOrders(filteredOrders.slice(0, visibleCount));
+  }, [visibleCount]);
+  
   const summaryData = useMemo(() => {
     const totalSales = filteredOrders.reduce((sum, order) => sum + (order.grandTotal || 0), 0);
     const totalOrders = filteredOrders.length;
@@ -271,6 +301,14 @@ export default function ReportsView({ orders, onNavigate, users, distributors, l
         return;
     }
     window.print();
+  };
+
+  const handleLoadMore = () => {
+    setIsLoadingMore(true);
+    setTimeout(() => {
+        setVisibleCount(prevCount => prevCount + ORDERS_TO_LOAD);
+        setIsLoadingMore(false);
+    }, 300);
   };
 
   return (
@@ -365,7 +403,9 @@ export default function ReportsView({ orders, onNavigate, users, distributors, l
                       </div>
                   </div>
                   
-                  <h3 className="text-lg font-semibold text-gray-700 mt-6 mb-4">Detalle de Pedidos</h3>
+                  <h3 className="text-lg font-semibold text-gray-700 mt-6 mb-4">
+                    Detalle de Pedidos ({displayedOrders.length} de {filteredOrders.length} mostrados)
+                  </h3>
                   
                   <div className="hidden lg:block overflow-x-auto">
                       <table className="min-w-full bg-white text-sm">
@@ -380,7 +420,7 @@ export default function ReportsView({ orders, onNavigate, users, distributors, l
                               </tr>
                           </thead>
                           <tbody>
-                          {filteredOrders.map((order, index) => (
+                          {displayedOrders.map((order, index) => (
                               <tr key={order.id} className={`border-b border-slate-200 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50'} hover:bg-blue-50 transition-colors`}>
                                   <td className="p-3 text-slate-700">{new Date(order.date).toLocaleDateString()}</td>
                                   <td className="p-3 font-medium text-slate-900">{order.client}</td>
@@ -423,7 +463,7 @@ export default function ReportsView({ orders, onNavigate, users, distributors, l
                   </div>
 
                   <div className="block lg:hidden space-y-4">
-                      {filteredOrders.map((order) => (
+                      {displayedOrders.map((order) => (
                           <ReportCard 
                               key={order.id}
                               order={order}
@@ -435,6 +475,22 @@ export default function ReportsView({ orders, onNavigate, users, distributors, l
                           />
                       ))}
                   </div>
+
+                  {filteredOrders.length > visibleCount && (
+                      <div className="text-center mt-8">
+                          <button
+                              onClick={handleLoadMore}
+                              disabled={isLoadingMore}
+                              className="inline-flex items-center gap-2 px-6 py-2 bg-slate-700 text-white font-semibold rounded-lg shadow-md hover:bg-slate-800 transition-colors disabled:bg-slate-400"
+                          >
+                              {isLoadingMore ? (
+                                  <><Loader2 className="animate-spin" size={18} /> Cargando...</>
+                              ) : (
+                                  `Cargar ${Math.min(ORDERS_TO_LOAD, filteredOrders.length - visibleCount)} más`
+                              )}
+                          </button>
+                      </div>
+                  )}
 
                   {filteredOrders.length === 0 && (
                   <div className="text-center text-gray-500 mt-6 py-10 border-t border-gray-200">
