@@ -109,7 +109,7 @@ export default function Login({ onLogin }) {
             onClick={handlePasswordReset}
             className="text-sm text-blue-600 hover:underline"
           >
-            
+            ¿Olvidaste tu contraseña?
           </button>
         </div>
 

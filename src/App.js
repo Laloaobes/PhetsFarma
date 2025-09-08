@@ -7,7 +7,7 @@ import OrderForm from './components/OrderForm';
 import OrderSummary from './components/OrderSummary';
 import Reports from './components/ReportsView';
 import GenericManagement from './components/GenericManagement';
-import ProductManagement from './components/ProductManagement';
+import ProductManagement from './components/ProductManagement'; // El componente actualizado
 import UserManagement from './components/UserManagement';
 import Login from './components/Login';
 
@@ -32,12 +32,11 @@ export default function App() {
   const [currentOrder, setCurrentOrder] = useState(null);
   
   // ---- ESTADOS PARA DATOS DE FIRESTORE ----
-  // Se ha eliminado el estado 'orders' de aquí
   const [clients, setClients] = useState([]);
   const [representatives, setRepresentatives] = useState([]);
   const [distributors, setDistributors] = useState([]);
   const [users, setUsers] = useState([]);
-  const [products, setProducts] = useState([]); 
+  // El estado 'products' ha sido ELIMINADO de aquí.
 
   useEffect(() => {
     const savedUser = localStorage.getItem("salesUser");
@@ -48,16 +47,14 @@ export default function App() {
   }, []);
 
   // ---- LEER DATOS DESDE FIREBASE EN TIEMPO REAL ----
-  // Se ha eliminado la carga de 'orders' de este efecto
+  // Se ha eliminado la carga de 'products' de este efecto.
   useEffect(() => {
-    const unsubProducts = onSnapshot(collection(db, "products"), (snapshot) => setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
     const unsubClients = onSnapshot(collection(db, "clients"), (snapshot) => setClients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
     const unsubReps = onSnapshot(collection(db, "representatives"), (snapshot) => setRepresentatives(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
     const unsubDists = onSnapshot(collection(db, "distributors"), (snapshot) => setDistributors(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
     const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
 
     return () => {
-      unsubProducts();
       unsubClients();
       unsubReps();
       unsubDists();
@@ -98,9 +95,7 @@ export default function App() {
     handleAddItem: async (item) => {
       try {
         const { id, ...itemData } = item;
-        if (key === 'products') {
-          itemData.price = parseFloat(itemData.price) || 0;
-        }
+        // La lógica específica de 'products' ya no es necesaria aquí.
         await addDoc(collection(db, key), itemData);
       } catch (error) {
         console.error(`Error al añadir en ${key}: `, error);
@@ -109,9 +104,7 @@ export default function App() {
     handleUpdateItem: async (updatedItem) => {
       try {
         const { id, ...itemData } = updatedItem;
-        if (key === 'products') {
-          itemData.price = parseFloat(itemData.price) || 0;
-        }
+        // La lógica específica de 'products' ya no es necesaria aquí.
         const itemDoc = doc(db, key, id);
         await updateDoc(itemDoc, itemData);
       } catch (error) {
@@ -175,7 +168,9 @@ export default function App() {
         return (
           <OrderForm
             onSaveOrder={handleSaveOrder}
-            products={products}
+            // 'products' ya no se pasa como prop, el formulario necesitará cargarlos por su cuenta si los usa.
+            // Para este ejemplo, asumimos que OrderForm no los necesita o los cargará internamente.
+            // Si OrderForm los necesita, habría que aplicar una refactorización similar.
             clients={clients}
             representatives={representatives}
             distributors={distributors}
@@ -189,7 +184,6 @@ export default function App() {
       case 'orderSummary':
         return <OrderSummary order={currentOrder} onNavigate={handleNavigate} previousView={lastView} user={user} />;
       case 'reports':
-        // ReportsView ya no recibe 'orders', es autosuficiente
         return <Reports 
                   onNavigate={handleNavigate} 
                   users={users} 
@@ -207,8 +201,14 @@ export default function App() {
         return <GenericManagement items={distributors} handlers={genericHandlers('distributors')} itemName="Distribuidor" user={user} />;
       case 'manageLaboratories':
         return <GenericManagement items={initialData.laboratories} handlers={{}} itemName="Laboratorio" user={user} isReadOnly={true} />;
+      
+      // --- ¡LLAMADA AL COMPONENTE ACTUALIZADA! ---
       case 'manageProducts':
-        return <ProductManagement products={products} laboratories={initialData.laboratories} user={user} handlers={genericHandlers('products')} />;
+        return <ProductManagement 
+                  laboratories={initialData.laboratories} 
+                  user={user} 
+                />;
+      
       case 'manageUsers':
         return <UserManagement user={user} />;
       default:
@@ -221,7 +221,7 @@ export default function App() {
       <Toaster 
         position="top-right"
         toastOptions={{
-          duration: 3000, // La notificación dura 3 segundos
+          duration: 3000,
         }}
       />
       

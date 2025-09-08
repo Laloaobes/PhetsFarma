@@ -1,19 +1,20 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { 
-    FileText, 
-    Search, 
-    FlaskConical, 
-    User, 
-    Truck, 
-    DollarSign, 
-    Hash, 
-    Calendar as CalendarIcon, 
-    Printer, 
+import {
+    FileText,
+    Search,
+    FlaskConical,
+    User,
+    Truck,
+    DollarSign,
+    Hash,
+    Calendar as CalendarIcon,
+    Printer,
     Trash2,
-    Loader2 
+    Loader2
 } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, query, orderBy, limit, startAfter, getDocs } from "firebase/firestore";
+import { getFunctions, httpsCallable } from "firebase/functions";
 
 // --- Sub-componente: Tarjeta de Resumen ---
 const SummaryCard = ({ icon, title, value, color }) => (
@@ -72,12 +73,12 @@ const ReportCard = ({ order, onNavigate, searchTerm, formatCurrency, onDeleteOrd
         )}
         <div className="flex justify-end items-center gap-2 pt-2 border-t mt-2">
             {canDelete && (
-                <button 
+                <button
                     onClick={() => {
                         if (window.confirm(`¿Estás seguro de que deseas eliminar el pedido para "${order.client}"?`)) {
                             onDeleteOrder(order.id);
                         }
-                    }} 
+                    }}
                     title="Eliminar pedido"
                     className="p-2 text-red-600 hover:text-red-800 transition-colors rounded-full hover:bg-red-100"
                 >
@@ -93,7 +94,6 @@ const ReportCard = ({ order, onNavigate, searchTerm, formatCurrency, onDeleteOrd
 
 // --- Componente para el formato de impresión ---
 const PrintableReport = ({ orders, formatCurrency, summaryData, dateRange, user }) => {
-    // ... (Este componente no cambia, se mantiene como lo tenías)
     return (
         <div id="printable-report" className="print-only">
             {/* ... Tu JSX para el reporte impreso ... */}
@@ -110,6 +110,11 @@ export default function ReportsView({ onNavigate, users, distributors, laborator
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
 
+  // Estados para el resumen global
+  const [globalSummary, setGlobalSummary] = useState({ totalSales: 0 });
+  const [isSummaryLoading, setIsSummaryLoading] = useState(true);
+
+  // Estados para los filtros
   const [filteredOrders, setFilteredOrders] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSeller, setFilterSeller] = useState(user?.role === 'Vendedor' ? user.name : '');
@@ -117,12 +122,11 @@ export default function ReportsView({ onNavigate, users, distributors, laborator
   const [filterLaboratory, setFilterLaboratory] = useState(user?.role === 'Gerente de laboratorio' ? user.laboratory : '');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  
+
   const ORDERS_PER_PAGE = 25;
 
   const fetchOrders = useCallback(async (isInitialLoad = false) => {
     if (!hasMore && !isInitialLoad) return;
-    
     if (isInitialLoad) setIsLoading(true);
     else setIsLoadingMore(true);
 
@@ -145,13 +149,39 @@ export default function ReportsView({ onNavigate, users, distributors, laborator
     }
   }, [lastVisible, hasMore]);
 
+  // useEffect para cargar el resumen global
+  useEffect(() => {
+    const fetchGlobalSummary = async () => {
+      if (!user) return;
+      setIsSummaryLoading(true);
+      try {
+        const functions = getFunctions();
+        const getSalesSummary = httpsCallable(functions, 'getSalesSummary');
+        const result = await getSalesSummary();
+        if (result && result.data) {
+          setGlobalSummary({ totalSales: result.data.totalGlobalSales || 0 });
+        } else {
+          console.error("La función getSalesSummary no devolvió datos válidos.");
+          setGlobalSummary({ totalSales: 0 });
+        }
+      } catch (error) {
+        console.error("Error al llamar la Cloud Function 'getSalesSummary':", error);
+        setGlobalSummary({ totalSales: 0 });
+      } finally {
+        setIsSummaryLoading(false);
+      }
+    };
+    fetchGlobalSummary();
+  }, [user]);
+
+  // useEffect para la carga inicial de pedidos
   useEffect(() => {
     fetchOrders(true);
   }, []);
 
+  // useEffect para aplicar filtros
   useEffect(() => {
     let tempOrders = [...orders];
-    
     if (user?.role === 'Gerente de laboratorio') tempOrders = tempOrders.filter(order => order.laboratory === user.laboratory);
     else if (user?.role === 'Vendedor') tempOrders = tempOrders.filter(order => order.representative === user.name);
 
@@ -163,7 +193,7 @@ export default function ReportsView({ onNavigate, users, distributors, laborator
         o.items?.some(item => item.productName?.toLowerCase().includes(lower))
       );
     }
-    
+
     if (filterSeller) tempOrders = tempOrders.filter(o => o.representative === filterSeller);
     if (filterDistributor) tempOrders = tempOrders.filter(o => o.distributor === filterDistributor);
     if (filterLaboratory) tempOrders = tempOrders.filter(o => o.laboratory === filterLaboratory);
@@ -174,14 +204,13 @@ export default function ReportsView({ onNavigate, users, distributors, laborator
   }, [orders, searchTerm, filterSeller, filterDistributor, filterLaboratory, startDate, endDate, user]);
 
   const summaryData = useMemo(() => ({
-    totalSales: filteredOrders.reduce((sum, order) => sum + (order.grandTotal || 0), 0),
     totalOrders: filteredOrders.length,
   }), [filteredOrders]);
 
   const canDelete = user && ['Super Admin', 'Admin'].includes(user.role);
   const formatCurrency = (total) => total?.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' }) || '$0.00';
   const handlePrintReport = () => { if (filteredOrders.length > 0) window.print(); else alert("No hay datos para imprimir."); };
-  
+
   const sortedSellers = useMemo(() => [...representatives].sort((a, b) => a.name.localeCompare(b.name)), [representatives]);
   const sortedDistributors = useMemo(() => [...distributors].sort((a, b) => a.name.localeCompare(b.name)), [distributors]);
   const sortedLaboratories = useMemo(() => [...laboratories].sort((a, b) => a.name.localeCompare(b.name)), [laboratories]);
@@ -205,15 +234,32 @@ export default function ReportsView({ onNavigate, users, distributors, laborator
           </button>
         </div>
         <div className="bg-white p-4 md:p-6 rounded-xl shadow-lg">
+
+          {/* --- SECCIÓN DE RESUMEN OCULTA --- */}
+          {/*
           <div className="mb-8">
-            <h3 className="text-lg font-semibold text-gray-700 mb-2">Resumen General (Datos Cargados)</h3>
-            <p className="text-sm text-gray-500 mb-6">Métricas clave basadas en los pedidos mostrados y filtros aplicados.</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <SummaryCard icon={<DollarSign />} title="Ventas Totales" value={formatCurrency(summaryData.totalSales)} color="#2563EB" />
-              <SummaryCard icon={<Hash />} title="Pedidos Totales" value={summaryData.totalOrders} color="#16A34A" />
+            <h3 className="text-lg font-semibold text-gray-700 mb-2">Resumen General</h3>
+            <p className="text-sm text-gray-500 mb-6">Métricas clave de la operación.</p>
+            <div className="grid grid-cols-1 md:max-w-sm gap-5">
+              <SummaryCard
+                icon={<DollarSign />}
+                title="Ventas Totales Globales"
+                value={isSummaryLoading ? 'Calculando...' : formatCurrency(globalSummary.totalSales)}
+                color="#8B5CF6"
+              />
+              <SummaryCard
+                icon={<Hash />}
+                title="Pedidos Cargados"
+                value={summaryData.totalOrders}
+                color="#16A34A"
+              />
             </div>
           </div>
+          */}
+
           <div className="border-t border-gray-200 pt-6">
+            
+            {/* --- SECCIÓN DE FILTROS VISIBLE DE NUEVO --- */}
             <div className="pb-4">
               <h3 className="text-lg font-semibold text-gray-700 mb-4">Filtros Avanzados</h3>
               <div className="space-y-4">
@@ -269,14 +315,14 @@ export default function ReportsView({ onNavigate, users, distributors, laborator
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredOrders.map((order, index) => (
+                  {filteredOrders.map((order) => (
                     <tr key={order.id} className={`border-b border-slate-200 hover:bg-blue-50`}>
                       <td className="p-3 text-slate-700">{new Date(order.date).toLocaleDateString()}</td>
                       <td className="p-3 font-medium text-slate-900">{order.client}</td>
                       <td className="p-3 text-slate-700">{order.representative || 'N/A'}</td>
                       <td className="p-3 text-slate-700 align-top">{searchTerm && order.items.filter(i => i.productName?.toLowerCase().includes(searchTerm.toLowerCase())).map(i => (<span key={i.sku} className="inline-block bg-blue-100 text-blue-800 text-xs font-medium mr-2 px-2.5 py-0.5 rounded-full mb-1">{i.productName}</span>))}</td>
                       <td className="p-3 text-right font-semibold text-slate-900">{formatCurrency(order.grandTotal)}</td>
-                      <td className="p-3 text-center"><div className="flex justify-center items-center gap-2"><button onClick={() => onNavigate('orderSummary', order)} className="font-medium text-blue-600 hover:text-blue-800">Ver Detalles</button>{canDelete && (<button onClick={() => {if (window.confirm(`¿Seguro?`)) {onDeleteOrder(order.id);}}} title="Eliminar" className="p-2 text-red-600 hover:bg-red-100 rounded-full"><Trash2 size={16} /></button>)}</div></td>
+                      <td className="p-3 text-center"><div className="flex justify-center items-center gap-2"><button onClick={() => onNavigate('orderSummary', order)} className="font-medium text-blue-600 hover:text-blue-800">Ver Detalles</button>{canDelete && (<button onClick={() => {if (window.confirm(`¿Seguro que deseas eliminar el pedido para "${order.client}"?`)) {onDeleteOrder(order.id);}}} title="Eliminar" className="p-2 text-red-600 hover:bg-red-100 rounded-full"><Trash2 size={16} /></button>)}</div></td>
                     </tr>
                   ))}
                 </tbody>
@@ -288,7 +334,7 @@ export default function ReportsView({ onNavigate, users, distributors, laborator
             
             {hasMore && (<div className="text-center mt-8"><button onClick={() => fetchOrders(false)} disabled={isLoadingMore} className="inline-flex items-center gap-2 px-6 py-2 bg-slate-700 text-white font-semibold rounded-lg shadow-md hover:bg-slate-800 disabled:bg-slate-400">{isLoadingMore ? <><Loader2 className="animate-spin" size={18} /> Cargando...</> : 'Cargar más pedidos'}</button></div>)}
             {!hasMore && orders.length > 0 && (<div className="text-center text-gray-500 mt-8 py-4 border-t"><p>Has llegado al final de la lista.</p></div>)}
-            {filteredOrders.length === 0 && !hasMore && (<div className="text-center text-gray-500 mt-6 py-10 border-t"><p>No se encontraron pedidos.</p></div>)}
+            {filteredOrders.length === 0 && !isLoading && (<div className="text-center text-gray-500 mt-6 py-10 border-t"><p>No se encontraron pedidos que coincidan con los filtros.</p></div>)}
           </div>
         </div>
       </div>
