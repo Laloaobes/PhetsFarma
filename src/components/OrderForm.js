@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ShoppingCart, User as UserIcon, Truck, DollarSign, Plus, Trash2, FlaskConical, Check, X } from 'lucide-react';
+// --- IMPORTACIONES AÑADIDAS ---
+import { collection, onSnapshot } from "firebase/firestore";
+import { db } from '../firebase'; // Asegúrate que la ruta a tu config de Firebase sea correcta
+import { ShoppingCart, User as UserIcon, Truck, DollarSign, Plus, Trash2, FlaskConical, Check, X, Loader2 } from 'lucide-react';
+
 
 // --- FUNCIÓN HELPER ---
 const formatNumber = (num) => {
@@ -222,7 +226,6 @@ const ProductRow = ({ item, index, onUpdate, onRemove, productList, laboratory }
 // --- COMPONENTE PRINCIPAL DEL FORMULARIO ---
 export default function OrderForm({ 
   onSaveOrder, 
-  products, 
   clients, // <-- IMPORTANTE: Recibe la lista de clientes
   representatives = [], 
   distributors = [], 
@@ -231,113 +234,148 @@ export default function OrderForm({
   onSaveNewClient,
   onSaveNewRepresentative,
   onSaveNewDistributor
-}) {
-  const [laboratory, setLaboratory] = useState((user?.role === 'Gerente de laboratorio' || user?.role === 'Vendedor') ? user.laboratory : "");
-  const [representative, setRepresentative] = useState(user?.role === 'Vendedor' ? user.name : "");
-  const [distributor, setDistributor] = useState("");
-  const [client, setClient] = useState("");
-  const [items, setItems] = useState([{ sku: "", productName: "", quantity: "1", bonus: "0", price: "0.00", discount: "0", total: "0.00" }]);
-  
-  const [isAddingNewClient, setIsAddingNewClient] = useState(false);
-  const [newClientName, setNewClientName] = useState("");
-  const [clientToSelectAfterAdd, setClientToSelectAfterAdd] = useState(null);
+}) {// ==================================================================
+  // 1. DECLARACIÓN DE LOS NUEVOS ESTADOS
+  // ==================================================================
+  const [products, setProducts] = useState([]);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(true);
 
-  const [isAddingNewRep, setIsAddingNewRep] = useState(false);
-  const [newRepName, setNewRepName] = useState("");
-  const [repToSelectAfterAdd, setRepToSelectAfterAdd] = useState(null);
+  const [laboratory, setLaboratory] = useState((user?.role === 'Gerente de laboratorio' || user?.role === 'Vendedor') ? user.laboratory : "");
+  const [representative, setRepresentative] = useState(user?.role === 'Vendedor' ? user.name : "");
+  const [distributor, setDistributor] = useState("");
+  const [client, setClient] = useState("");
+  const [items, setItems] = useState([{ sku: "", productName: "", quantity: "1", bonus: "0", price: "0.00", discount: "0", total: "0.00" }]);
+  
+  const [isAddingNewClient, setIsAddingNewClient] = useState(false);
+  const [newClientName, setNewClientName] = useState("");
+  const [clientToSelectAfterAdd, setClientToSelectAfterAdd] = useState(null);
 
-  const [isAddingNewDist, setIsAddingNewDist] = useState(false);
-  const [newDistName, setNewDistName] = useState("");
-  const [distToSelectAfterAdd, setDistToSelectAfterAdd] = useState(null);
-  
-  const [showModal, setShowModal] = useState(false);
-  const [modalMessage, setModalMessage] = useState("");
+  const [isAddingNewRep, setIsAddingNewRep] = useState(false);
+  const [newRepName, setNewRepName] = useState("");
+  const [repToSelectAfterAdd, setRepToSelectAfterAdd] = useState(null);
 
-  const productsByLaboratory = laboratory ? products.filter(p => p.laboratory === laboratory) : [];
-  
-  const sortedDistributors = [...distributors].sort((a, b) => a.name.localeCompare(b.name));
-  const sortedRepresentatives = [...representatives].sort((a, b) => a.name.localeCompare(b.name));
+  const [isAddingNewDist, setIsAddingNewDist] = useState(false);
+  const [newDistName, setNewDistName] = useState("");
+  const [distToSelectAfterAdd, setDistToSelectAfterAdd] = useState(null);
+  
+  const [showModal, setShowModal] = useState(false);
+  const [modalMessage, setModalMessage] = useState("");
 
-  const { rawSubtotal, discountAmount, grandTotal } = items.reduce((totals, item) => {
-      const quantity = parseFloat(item.quantity) || 0;
-      const price = parseFloat(item.price) || 0;
-      const discount = parseFloat(item.discount) || 0;
-      const itemSubtotal = quantity * price;
-      const itemDiscount = itemSubtotal * discount;
-      totals.rawSubtotal += itemSubtotal;
-      totals.discountAmount += itemDiscount;
-      totals.grandTotal += (itemSubtotal - itemDiscount);
-      return totals;
-    }, { rawSubtotal: 0, discountAmount: 0, grandTotal: 0 }
-  );
-
+  // ==================================================================
+  // 2. LA CARGA DE DATOS DESDE FIREBASE (useEffect)
+  // ==================================================================
   useEffect(() => {
-    setItems([{ sku: "", productName: "", quantity: "1", bonus: "0", price: "0.00", discount: "0", total: "0.00" }]);
-  }, [laboratory]);
+    setIsLoadingProducts(true);
+    // Se suscribe a la colección "products"
+    const unsubscribe = onSnapshot(collection(db, "products"), (snapshot) => {
+      const productsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setProducts(productsData); // Guarda los productos en el estado
+      setIsLoadingProducts(false); // Cambia el estado de carga a falso
+    });
 
-  useEffect(() => {
-    if (clientToSelectAfterAdd) {
-      setClient(clientToSelectAfterAdd);
-      setClientToSelectAfterAdd(null);
-    }
-  }, [clientToSelectAfterAdd]);
-  
-  useEffect(() => {
-    if (repToSelectAfterAdd && representatives.some(r => r.name === repToSelectAfterAdd)) {
-        setRepresentative(repToSelectAfterAdd);
-        setRepToSelectAfterAdd(null);
-    }
-  }, [representatives, repToSelectAfterAdd]);
+    // Limpia la suscripción cuando el componente se desmonta
+    return () => unsubscribe();
+  }, []); // El array vacío asegura que esto se ejecute solo una vez
 
-  useEffect(() => {
-    if (distToSelectAfterAdd && distributors.some(d => d.name === distToSelectAfterAdd)) {
-        setDistributor(distToSelectAfterAdd);
-        setDistToSelectAfterAdd(null);
-    }
-  }, [distributors, distToSelectAfterAdd]);
 
-  const handleUpdateItem = (index, updatedItem) => setItems(items.map((item, i) => i === index ? updatedItem : item));
-  const handleAddItem = () => laboratory ? setItems([...items, { sku: "", productName: "", quantity: "1", bonus: "0", price: "0.00", discount: "0", total: "0.00" }]) : (setModalMessage("Por favor, selecciona un laboratorio primero."), setShowModal(true));
-  const handleRemoveItem = (index) => setItems(items.filter((_, i) => i !== index));
+  const productsByLaboratory = laboratory ? products.filter(p => p.laboratory === laboratory) : [];
+  
+  const sortedDistributors = [...distributors].sort((a, b) => a.name.localeCompare(b.name));
+  const sortedRepresentatives = [...representatives].sort((a, b) => a.name.localeCompare(b.name));
 
-  const createToggleHandler = (setter) => () => setter(prev => !prev);
-  const createConfirmHandler = (name, onSave, setName, setToggle, setSelectAfter) => () => {
-    if (name.trim()) {
-      onSave({ name });
-      setSelectAfter(name);
-      setName('');
-      setToggle(false);
-    }
-  };
-  const createCancelHandler = (setName, setToggle) => () => {
-    setName('');
-    setToggle(false);
-  };
+  const { rawSubtotal, discountAmount, grandTotal } = items.reduce((totals, item) => {
+      const quantity = parseFloat(item.quantity) || 0;
+      const price = parseFloat(item.price) || 0;
+      const discount = parseFloat(item.discount) || 0;
+      const itemSubtotal = quantity * price;
+      const itemDiscount = itemSubtotal * discount;
+      totals.rawSubtotal += itemSubtotal;
+      totals.discountAmount += itemDiscount;
+      totals.grandTotal += (itemSubtotal - itemDiscount);
+      return totals;
+    }, { rawSubtotal: 0, discountAmount: 0, grandTotal: 0 }
+  );
 
-  const handleToggleNewClient = createToggleHandler(setIsAddingNewClient);
-  const handleConfirmAddClient = createConfirmHandler(newClientName, onSaveNewClient, setNewClientName, setIsAddingNewClient, setClientToSelectAfterAdd);
-  const handleCancelAddClient = createCancelHandler(setNewClientName, setIsAddingNewClient);
+  useEffect(() => {
+    setItems([{ sku: "", productName: "", quantity: "1", bonus: "0", price: "0.00", discount: "0", total: "0.00" }]);
+  }, [laboratory]);
 
-  const handleToggleNewRep = createToggleHandler(setIsAddingNewRep);
-  const handleConfirmAddRep = createConfirmHandler(newRepName, onSaveNewRepresentative, setNewRepName, setIsAddingNewRep, setRepToSelectAfterAdd);
-  const handleCancelAddRep = createCancelHandler(setNewRepName, setIsAddingNewRep);
+  useEffect(() => {
+    if (clientToSelectAfterAdd) {
+      setClient(clientToSelectAfterAdd);
+      setClientToSelectAfterAdd(null);
+    }
+  }, [clientToSelectAfterAdd]);
+  
+  useEffect(() => {
+    if (repToSelectAfterAdd && representatives.some(r => r.name === repToSelectAfterAdd)) {
+        setRepresentative(repToSelectAfterAdd);
+        setRepToSelectAfterAdd(null);
+    }
+  }, [representatives, repToSelectAfterAdd]);
 
-  const handleToggleNewDist = createToggleHandler(setIsAddingNewDist);
-  const handleConfirmAddDist = createConfirmHandler(newDistName, onSaveNewDistributor, setNewDistName, setIsAddingNewDist, setDistToSelectAfterAdd);
-  const handleCancelAddDist = createCancelHandler(setNewDistName, setIsAddingNewDist);
+  useEffect(() => {
+    if (distToSelectAfterAdd && distributors.some(d => d.name === distToSelectAfterAdd)) {
+        setDistributor(distToSelectAfterAdd);
+        setDistToSelectAfterAdd(null);
+    }
+  }, [distributors, distToSelectAfterAdd]);
 
-  const handleSubmit = () => {
-    if (!client || !laboratory || items.some((i) => !i.productName)) {
-      setModalMessage("Completa laboratorio, cliente y asegúrate que todos los productos tengan nombre.");
-      setShowModal(true);
-      return;
-    }
-    const itemsToSave = items.map(item => ({...item, quantity: parseFloat(item.quantity) || 0, bonus: parseFloat(item.bonus) || 0, price: parseFloat(item.price) || 0, discount: parseFloat(item.discount) || 0, total: parseFloat(item.total) || 0, }));
-    const order = { date: new Date(), representative, client, distributor, laboratory, items: itemsToSave, subtotal: rawSubtotal, discountAmount, grandTotal };
-    onSaveOrder(order);
-  };
+  const handleUpdateItem = (index, updatedItem) => setItems(items.map((item, i) => i === index ? updatedItem : item));
+  const handleAddItem = () => laboratory ? setItems([...items, { sku: "", productName: "", quantity: "1", bonus: "0", price: "0.00", discount: "0", total: "0.00" }]) : (setModalMessage("Por favor, selecciona un laboratorio primero."), setShowModal(true));
+  const handleRemoveItem = (index) => setItems(items.filter((_, i) => i !== index));
 
-  return (
+  const createToggleHandler = (setter) => () => setter(prev => !prev);
+  const createConfirmHandler = (name, onSave, setName, setToggle, setSelectAfter) => () => {
+    if (name.trim()) {
+      onSave({ name });
+      setSelectAfter(name);
+      setName('');
+      setToggle(false);
+    }
+  };
+  const createCancelHandler = (setName, setToggle) => () => {
+    setName('');
+    setToggle(false);
+  };
+
+  const handleToggleNewClient = createToggleHandler(setIsAddingNewClient);
+  const handleConfirmAddClient = createConfirmHandler(newClientName, onSaveNewClient, setNewClientName, setIsAddingNewClient, setClientToSelectAfterAdd);
+  const handleCancelAddClient = createCancelHandler(setNewClientName, setIsAddingNewClient);
+
+  const handleToggleNewRep = createToggleHandler(setIsAddingNewRep);
+  const handleConfirmAddRep = createConfirmHandler(newRepName, onSaveNewRepresentative, setNewRepName, setIsAddingNewRep, setRepToSelectAfterAdd);
+  const handleCancelAddRep = createCancelHandler(setNewRepName, setIsAddingNewRep);
+
+  const handleToggleNewDist = createToggleHandler(setIsAddingNewDist);
+  const handleConfirmAddDist = createConfirmHandler(newDistName, onSaveNewDistributor, setNewDistName, setIsAddingNewDist, setDistToSelectAfterAdd);
+  const handleCancelAddDist = createCancelHandler(setNewDistName, setIsAddingNewDist);
+
+  const handleSubmit = () => {
+    if (!client || !laboratory || items.some((i) => !i.productName)) {
+      setModalMessage("Completa laboratorio, cliente y asegúrate que todos los productos tengan nombre.");
+      setShowModal(true);
+      return;
+    }
+    const itemsToSave = items.map(item => ({...item, quantity: parseFloat(item.quantity) || 0, bonus: parseFloat(item.bonus) || 0, price: parseFloat(item.price) || 0, discount: parseFloat(item.discount) || 0, total: parseFloat(item.total) || 0, }));
+    const order = { date: new Date(), representative, client, distributor, laboratory, items: itemsToSave, subtotal: rawSubtotal, discountAmount, grandTotal };
+    onSaveOrder(order);
+  };
+
+  // ==================================================================
+  // 3. EL INDICADOR DE CARGA EN LA INTERFAZ
+  // ==================================================================
+  if (isLoadingProducts) {
+    return (
+      <div className="p-8 bg-white rounded-xl shadow-lg flex flex-col items-center justify-center h-64">
+        <Loader2 className="h-12 w-12 text-indigo-500 animate-spin" />
+        <p className="mt-4 text-lg text-slate-600">Cargando productos...</p>
+      </div>
+    );
+  }
+
+  // Si no está cargando, se muestra el formulario completo.
+  return (
     <>
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
