@@ -284,6 +284,19 @@ export default function ReportsView({ onNavigate, distributors, laboratories, us
 
     const canDelete = user && ['Super Admin', 'Admin'].includes(user.role);
     const formatCurrency = (total) => total?.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' }) || '$0.00';
+    
+    const handleDeleteOrder = async (orderId) => {
+        const promise = onDeleteOrder(orderId);
+        
+        toast.promise(promise, {
+            loading: 'Eliminando pedido...',
+            success: () => {
+                setOrders(currentOrders => currentOrders.filter(order => order.id !== orderId));
+                return 'Pedido eliminado exitosamente.';
+            },
+            error: 'No se pudo eliminar el pedido.',
+        });
+    };
 
     const handleCsvDownload = () => {
         if (finalOrders.length === 0) {
@@ -398,7 +411,7 @@ export default function ReportsView({ onNavigate, distributors, laboratories, us
                                         <td className="p-3 text-slate-700">{order.representative || 'N/A'}</td>
                                         {isProductSearchActive && <td className="p-3 text-slate-700">{order.matchedProducts.length > 0 ? order.matchedProducts.map((p, index) => <div key={index} className="text-xs"><span className="font-semibold">{p.name}</span> ({p.qty} pz)</div>) : <span className="text-gray-400 text-xs">N/A</span>}</td>}
                                         <td className="p-3 text-right font-semibold text-slate-900">{formatCurrency(order.grandTotal)}</td>
-                                        <td className="p-3 text-center"><div className="flex justify-center items-center gap-2"><button onClick={() => onNavigate('orderSummary', order)} className="font-medium text-blue-600 hover:text-blue-800">Ver Detalles</button>{canDelete && (<button onClick={() => {if (window.confirm(`¿Seguro que deseas eliminar el pedido para "${order.client}"?`)) {onDeleteOrder(order.id);}}} title="Eliminar" className="p-2 text-red-600 hover:bg-red-100 rounded-full"><Trash2 size={16} /></button>)}</div></td>
+                                        <td className="p-3 text-center"><div className="flex justify-center items-center gap-2"><button onClick={() => onNavigate('orderSummary', order)} className="font-medium text-blue-600 hover:text-blue-800">Ver Detalles</button>{canDelete && (<button onClick={() => {if (window.confirm(`¿Seguro que deseas eliminar el pedido para "${order.client}"?`)) {handleDeleteOrder(order.id);}}} title="Eliminar" className="p-2 text-red-600 hover:bg-red-100 rounded-full"><Trash2 size={16} /></button>)}</div></td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -406,7 +419,7 @@ export default function ReportsView({ onNavigate, distributors, laboratories, us
                     </div>
 
                     <div className="block lg:hidden space-y-4">
-                        {finalOrders.map((order) => (<ReportCard key={order.id} {...{order, onNavigate, formatCurrency, onDeleteOrder, canDelete, isProductSearchActive}} />))}
+                        {finalOrders.map((order) => (<ReportCard key={order.id} {...{order, onNavigate, formatCurrency, onDeleteOrder: handleDeleteOrder, canDelete, isProductSearchActive}} />))}
                     </div>
                     
                     {!isFilterActive && !isProductSearchActive && hasMore && (
