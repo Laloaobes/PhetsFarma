@@ -164,6 +164,7 @@ export default function ReportsView({ onNavigate, distributors, laboratories, us
     const [isLoading, setIsLoading] = useState(true);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
     const [hasMore, setHasMore] = useState(true);
+    const [isFullDataLoadedForSearch, setIsFullDataLoadedForSearch] = useState(false);
 
     const [searchTerm, setSearchTerm] = useState('');
     const [filterSeller, setFilterSeller] = useState(user?.role === 'Vendedor' ? user.name : '');
@@ -173,7 +174,7 @@ export default function ReportsView({ onNavigate, distributors, laboratories, us
     const [endDate, setEndDate] = useState('');
 
     const debouncedSearchTerm = useDebounce(searchTerm, 500);
-    const ORDERS_PER_PAGE = 25;
+    const ORDERS_PER_PAGE = 30;
 
     const isFilterActive = useMemo(() => {
         return !!(filterSeller || filterDistributor || filterLaboratory || startDate || endDate);
@@ -181,9 +182,13 @@ export default function ReportsView({ onNavigate, distributors, laboratories, us
 
     const isProductSearchActive = useMemo(() => !!debouncedSearchTerm, [debouncedSearchTerm]);
 
-    const fetchOrders = useCallback(async (loadMore = false) => {
-        if (loadMore && (!hasMore || isLoadingMore)) return;
-        loadMore ? setIsLoadingMore(true) : setIsLoading(true);
+    const fetchOrders = useCallback(async (loadMore = false, isInitialSearchLoad = false) => {
+        if (loadMore) {
+            if (!hasMore || isLoadingMore) return;
+            setIsLoadingMore(true);
+        } else {
+            setIsLoading(true);
+        }
 
         try {
             let constraints = [orderBy("date", "desc")];
@@ -193,7 +198,6 @@ export default function ReportsView({ onNavigate, distributors, laboratories, us
             if (startDate) constraints.push(where("date", ">=", new Date(startDate)));
             if (endDate) constraints.push(where("date", "<=", new Date(endDate + 'T23:59:59')));
 
-            // La paginación solo se aplica si NINGÚN filtro (ni de selectores ni de búsqueda) está activo.
             if (!isFilterActive && !isProductSearchActive) {
                 constraints.push(limit(ORDERS_PER_PAGE));
             }
@@ -205,7 +209,7 @@ export default function ReportsView({ onNavigate, distributors, laboratories, us
             const docSnapshots = await getDocs(q);
             const newOrders = docSnapshots.docs.map(doc => ({ id: doc.id, ...doc.data(), date: doc.data().date?.toDate() || new Date() }));
             
-            setOrders(prev => loadMore ? [...prev, ...newOrders] : newOrders);
+            setOrders(prev => (loadMore && !isInitialSearchLoad) ? [...prev, ...newOrders] : newOrders);
             setLastVisible(docSnapshots.docs[docSnapshots.docs.length - 1]);
             setHasMore(isFilterActive || isProductSearchActive ? false : docSnapshots.docs.length === ORDERS_PER_PAGE);
         } catch (error) {
@@ -216,14 +220,33 @@ export default function ReportsView({ onNavigate, distributors, laboratories, us
         }
     }, [isFilterActive, isProductSearchActive, filterSeller, filterDistributor, filterLaboratory, startDate, endDate, lastVisible, hasMore, isLoadingMore]);
 
-    // MODIFICADO: useEffect ahora reacciona a `isProductSearchActive`
-    // para forzar la recarga de TODOS los datos cuando se empieza a buscar.
     useEffect(() => {
+        setIsLoading(true);
         setOrders([]);
         setLastVisible(null);
         setHasMore(true);
+        setIsFullDataLoadedForSearch(false);
         fetchOrders(false);
-    }, [isFilterActive, isProductSearchActive, filterSeller, filterDistributor, filterLaboratory, startDate, endDate]);
+    }, [filterSeller, filterDistributor, filterLaboratory, startDate, endDate]);
+
+    useEffect(() => {
+        if (isProductSearchActive && !isFullDataLoadedForSearch) {
+            setIsLoading(true);
+            setOrders([]);
+            fetchOrders(false, true).then(() => {
+                setIsFullDataLoadedForSearch(true);
+            });
+        }
+        else if (!isProductSearchActive && isFullDataLoadedForSearch) {
+            setIsLoading(true);
+            setOrders([]);
+            setLastVisible(null);
+            setHasMore(true);
+            setIsFullDataLoadedForSearch(false);
+            fetchOrders(false);
+        }
+    }, [isProductSearchActive, isFullDataLoadedForSearch, fetchOrders]);
+
 
     const filteredAndEnhancedOrders = useMemo(() => {
         if (!debouncedSearchTerm) {
@@ -243,7 +266,8 @@ export default function ReportsView({ onNavigate, distributors, laboratories, us
             const newOrder = { ...order, matchedProducts: [] };
             if (order.items && Array.isArray(order.items)) {
                 order.items.forEach(item => {
-                    if (item.productName?.toLowerCase().includes(debouncedSearchTerm.toLowerCase())) {
+                    const productNameLower = item.productName?.toLowerCase() || '';
+                    if (searchKeywords.every(kw => productNameLower.includes(kw))) {
                         newOrder.matchedProducts.push({ name: item.productName, qty: item.qty });
                     }
                 });
@@ -252,7 +276,7 @@ export default function ReportsView({ onNavigate, distributors, laboratories, us
         });
     }, [orders, debouncedSearchTerm]);
     
-    const finalOrders = debouncedSearchTerm ? filteredAndEnhancedOrders : orders;
+    const finalOrders = isProductSearchActive ? filteredAndEnhancedOrders : orders;
     
     const filteredSalesTotal = useMemo(() => {
         return finalOrders.reduce((total, order) => total + (order.grandTotal || 0), 0);
@@ -300,7 +324,7 @@ export default function ReportsView({ onNavigate, distributors, laboratories, us
     const sortedDistributors = useMemo(() => [...distributors].sort((a, b) => a.name.localeCompare(b.name)), [distributors]);
     const sortedLaboratories = useMemo(() => [...laboratories].sort((a, b) => a.name.localeCompare(b.name)), [laboratories]);
 
-    if (isLoading && orders.length === 0) {
+    if (isLoading) {
         return <div className="flex justify-center items-center h-screen"><Loader2 className="animate-spin h-12 w-12 text-blue-600" /></div>;
     }
 
