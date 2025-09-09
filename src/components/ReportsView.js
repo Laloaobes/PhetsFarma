@@ -33,7 +33,7 @@ const FilterInput = ({ icon, label, children }) => (
 );
 
 // --- Sub-componente: Tarjeta de Reporte para Móvil ---
-const ReportCard = ({ order, onNavigate, formatCurrency, onDeleteOrder, canDelete }) => (
+const ReportCard = ({ order, onNavigate, formatCurrency, onDeleteOrder, canDelete, isProductSearchActive }) => (
     <div className="bg-white rounded-xl shadow-lg p-4 border-l-4 border-blue-500 space-y-3">
         <div className="flex justify-between items-start gap-4">
             <div className="min-w-0 flex-1">
@@ -45,10 +45,24 @@ const ReportCard = ({ order, onNavigate, formatCurrency, onDeleteOrder, canDelet
                 <p className="font-bold text-lg text-blue-600">{formatCurrency(order.grandTotal)}</p>
             </div>
         </div>
-        <div className="text-xs text-gray-500 border-t pt-2">
+        <div className="text-xs text-gray-500 border-t pt-2 space-y-1">
             <p><strong>Fecha:</strong> {new Date(order.date).toLocaleDateString()}</p>
             <p><strong>Vendedor:</strong> {order.representative || 'N/A'}</p>
         </div>
+        
+        {isProductSearchActive && order.matchedProducts && order.matchedProducts.length > 0 && (
+            <div className="border-t pt-2">
+                <p className="text-xs font-semibold text-gray-600 mb-1">Productos Coincidentes:</p>
+                <div className="flex flex-wrap gap-1">
+                    {order.matchedProducts.map((item, idx) => (
+                        <span key={idx} className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded-full">
+                            {item.name} ({item.qty} pz)
+                        </span>
+                    ))}
+                </div>
+            </div>
+        )}
+        
         <div className="flex justify-end items-center gap-2 pt-2 border-t mt-2">
             {canDelete && (
                 <button
@@ -101,7 +115,6 @@ const ReportPDF = ({ orders, formatCurrency, summaryData, dateRange, user }) => 
                     </View>
                     <Text style={styles.subtitle}>Fecha: {new Date().toLocaleDateString('es-MX')}</Text>
                 </View>
-
                 <View style={styles.summary}>
                     <View style={styles.summaryItem}>
                         <Text style={styles.summaryLabel}>Ventas Totales</Text>
@@ -112,7 +125,6 @@ const ReportPDF = ({ orders, formatCurrency, summaryData, dateRange, user }) => 
                         <Text style={styles.summaryValue}>{summaryData.totalOrders}</Text>
                     </View>
                 </View>
-
                 <View style={styles.table}>
                     <View style={[styles.tableRow, styles.tableHeader]}>
                         <Text style={styles.tableCol}>Fecha</Text>
@@ -164,8 +176,10 @@ export default function ReportsView({ onNavigate, distributors, laboratories, us
     const ORDERS_PER_PAGE = 25;
 
     const isFilterActive = useMemo(() => {
-        return !!(filterSeller || filterDistributor || filterLaboratory || startDate || endDate || debouncedSearchTerm);
-    }, [filterSeller, filterDistributor, filterLaboratory, startDate, endDate, debouncedSearchTerm]);
+        return !!(filterSeller || filterDistributor || filterLaboratory || startDate || endDate);
+    }, [filterSeller, filterDistributor, filterLaboratory, startDate, endDate]);
+
+    const isProductSearchActive = useMemo(() => !!debouncedSearchTerm, [debouncedSearchTerm]);
 
     const fetchOrders = useCallback(async (loadMore = false) => {
         if (loadMore && (!hasMore || isLoadingMore)) return;
@@ -178,14 +192,14 @@ export default function ReportsView({ onNavigate, distributors, laboratories, us
             if (filterLaboratory) constraints.push(where("laboratory", "==", filterLaboratory));
             if (startDate) constraints.push(where("date", ">=", new Date(startDate)));
             if (endDate) constraints.push(where("date", "<=", new Date(endDate + 'T23:59:59')));
-            if (debouncedSearchTerm) {
-                const lowerCaseTerm = debouncedSearchTerm.toLowerCase();
-                constraints.push(where("clientSearchable", ">=", lowerCaseTerm));
-                constraints.push(where("clientSearchable", "<=", lowerCaseTerm + '\uf8ff'));
-            }
 
-            if (!isFilterActive) constraints.push(limit(ORDERS_PER_PAGE));
-            if (loadMore && lastVisible) constraints.push(startAfter(lastVisible));
+            // La paginación solo se aplica si NINGÚN filtro (ni de selectores ni de búsqueda) está activo.
+            if (!isFilterActive && !isProductSearchActive) {
+                constraints.push(limit(ORDERS_PER_PAGE));
+            }
+            if (loadMore && lastVisible) {
+                constraints.push(startAfter(lastVisible));
+            }
 
             const q = query(collection(db, "orders"), ...constraints);
             const docSnapshots = await getDocs(q);
@@ -193,59 +207,85 @@ export default function ReportsView({ onNavigate, distributors, laboratories, us
             
             setOrders(prev => loadMore ? [...prev, ...newOrders] : newOrders);
             setLastVisible(docSnapshots.docs[docSnapshots.docs.length - 1]);
-            setHasMore(isFilterActive ? false : docSnapshots.docs.length === ORDERS_PER_PAGE);
+            setHasMore(isFilterActive || isProductSearchActive ? false : docSnapshots.docs.length === ORDERS_PER_PAGE);
         } catch (error) {
             console.error("Error al cargar pedidos. Revisa tus índices de Firestore:", error);
         } finally {
             setIsLoading(false);
             setIsLoadingMore(false);
         }
-    }, [isFilterActive, filterSeller, filterDistributor, filterLaboratory, startDate, endDate, debouncedSearchTerm, lastVisible, hasMore, isLoadingMore]);
+    }, [isFilterActive, isProductSearchActive, filterSeller, filterDistributor, filterLaboratory, startDate, endDate, lastVisible, hasMore, isLoadingMore]);
 
+    // MODIFICADO: useEffect ahora reacciona a `isProductSearchActive`
+    // para forzar la recarga de TODOS los datos cuando se empieza a buscar.
     useEffect(() => {
         setOrders([]);
         setLastVisible(null);
         setHasMore(true);
         fetchOrders(false);
-    }, [isFilterActive, filterSeller, filterDistributor, filterLaboratory, startDate, endDate, debouncedSearchTerm]);
+    }, [isFilterActive, isProductSearchActive, filterSeller, filterDistributor, filterLaboratory, startDate, endDate]);
 
+    const filteredAndEnhancedOrders = useMemo(() => {
+        if (!debouncedSearchTerm) {
+            return orders.map(o => ({ ...o, matchedProducts: [] }));
+        }
+        const searchKeywords = debouncedSearchTerm.toLowerCase().split(' ').filter(Boolean);
+        const matchingOrders = orders.filter(order => {
+            const searchableText = [
+                order.client,
+                order.representative,
+                order.distributor,
+                ...(order.items?.map(i => i.productName) || [])
+            ].join(' ').toLowerCase();
+            return searchKeywords.every(keyword => searchableText.includes(keyword));
+        });
+        return matchingOrders.map(order => {
+            const newOrder = { ...order, matchedProducts: [] };
+            if (order.items && Array.isArray(order.items)) {
+                order.items.forEach(item => {
+                    if (item.productName?.toLowerCase().includes(debouncedSearchTerm.toLowerCase())) {
+                        newOrder.matchedProducts.push({ name: item.productName, qty: item.qty });
+                    }
+                });
+            }
+            return newOrder;
+        });
+    }, [orders, debouncedSearchTerm]);
+    
+    const finalOrders = debouncedSearchTerm ? filteredAndEnhancedOrders : orders;
+    
     const filteredSalesTotal = useMemo(() => {
-        return orders.reduce((total, order) => total + (order.grandTotal || 0), 0);
-    }, [orders]);
+        return finalOrders.reduce((total, order) => total + (order.grandTotal || 0), 0);
+    }, [finalOrders]);
 
     const canDelete = user && ['Super Admin', 'Admin'].includes(user.role);
     const formatCurrency = (total) => total?.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' }) || '$0.00';
 
     const handleCsvDownload = () => {
-        if (orders.length === 0) {
+        if (finalOrders.length === 0) {
             toast.error('No hay datos para exportar.');
             return;
         }
-
         const escapeCsvCell = (cell) => {
-            if (cell === null || cell === undefined) return '';
-            const cellStr = String(cell);
+            const cellStr = String(cell ?? '');
             if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
                 return `"${cellStr.replace(/"/g, '""')}"`;
             }
             return cellStr;
         };
-        
         const headers = ['Fecha', 'Cliente', 'Vendedor', 'Total'];
-        const rows = orders.map(order => [
+        const rows = finalOrders.map(order => [
             new Date(order.date).toLocaleDateString('es-MX'),
             order.client,
             order.representative || 'N/A',
             order.grandTotal || 0
         ]);
-
         let csvContent = "data:text/csv;charset=utf-8,";
         csvContent += headers.map(escapeCsvCell).join(",") + "\r\n";
         rows.forEach(rowArray => {
             let row = rowArray.map(escapeCsvCell).join(",");
             csvContent += row + "\r\n";
         });
-
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
@@ -253,7 +293,6 @@ export default function ReportsView({ onNavigate, distributors, laboratories, us
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        
         toast.success('Reporte CSV descargado.');
     };
 
@@ -268,47 +307,28 @@ export default function ReportsView({ onNavigate, distributors, laboratories, us
     return (
         <div className="space-y-6">
             <Toaster position="top-right" reverseOrder={false} />
-
             <div className="flex flex-wrap justify-between items-center gap-4">
                 <h2 className="text-2xl lg:text-3xl font-bold text-gray-800 flex items-center"><FileText className="mr-3 text-blue-600" /> Reportes de Pedidos</h2>
-                
                 <div className="flex items-center gap-3">
-                    <button
-                        onClick={handleCsvDownload}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700"
-                    >
+                    <button onClick={handleCsvDownload} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700">
                         <FileSpreadsheet size={18} /> Descargar CSV
                     </button>
-                    <div onClick={() => toast.success('Iniciando descarga del PDF...')}>
+                    <div onClick={() => { if (finalOrders.length > 0) toast.success('Iniciando descarga del PDF...'); else toast.error('No hay datos para exportar.'); }}>
                         <PDFDownloadLink
-                            document={
-                                <ReportPDF
-                                    orders={orders}
-                                    formatCurrency={formatCurrency}
-                                    summaryData={{ totalOrders: orders.length, salesTotal: filteredSalesTotal }}
-                                    dateRange={startDate && endDate ? `${new Date(startDate).toLocaleDateString('es-MX')} al ${new Date(endDate).toLocaleDateString('es-MX')}` : ''}
-                                    user={user}
-                                />
-                            }
+                            document={<ReportPDF orders={finalOrders} formatCurrency={formatCurrency} summaryData={{ totalOrders: finalOrders.length, salesTotal: filteredSalesTotal }} dateRange={startDate && endDate ? `${new Date(startDate).toLocaleDateString('es-MX')} al ${new Date(endDate).toLocaleDateString('es-MX')}` : ''} user={user} />}
                             fileName={`reporte-pedidos-${new Date().toISOString().slice(0,10)}.pdf`}
-                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700"
+                            className={`flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 ${finalOrders.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
-                            {({ loading }) =>
-                                loading ? (
-                                    <><Loader2 className="animate-spin h-4 w-4" /> Generando...</>
-                                ) : (
-                                    <><Download size={18} /> Descargar PDF</>
-                                )
-                            }
+                            {({ loading }) => loading ? <><Loader2 className="animate-spin h-4 w-4" /> Generando...</> : <><Download size={18} /> Descargar PDF</>}
                         </PDFDownloadLink>
                     </div>
                 </div>
             </div>
 
-            {isFilterActive && (
+            {(isFilterActive || isProductSearchActive) && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <SummaryCard icon={<DollarSign />} title="Ventas Totales (Filtro Actual)" value={formatCurrency(filteredSalesTotal)} color="#10B981" />
-                    <SummaryCard icon={<Hash />} title="Pedidos Encontrados" value={orders.length} color="#3B82F6" />
+                    <SummaryCard icon={<Hash />} title="Pedidos Encontrados" value={finalOrders.length} color="#3B82F6" />
                 </div>
             )}
 
@@ -317,40 +337,17 @@ export default function ReportsView({ onNavigate, distributors, laboratories, us
                     <div className="pb-4">
                         <h3 className="text-lg font-semibold text-gray-700 mb-4">Filtros Avanzados</h3>
                         <div className="space-y-4">
-                            <FilterInput label="Búsqueda por Cliente" icon={<Search className="text-gray-500 mr-3" />}>
-                                <input type="text" placeholder="Buscar por cliente..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-transparent focus:outline-none text-sm"/>
+                            <FilterInput label="Búsqueda General" icon={<Search className="text-gray-500 mr-3" />}>
+                                <input type="text" placeholder="Buscar por cliente, vendedor, producto..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-transparent focus:outline-none text-sm"/>
                             </FilterInput>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {user?.role !== 'Vendedor' && (
-                                    <FilterInput label="Vendedor" icon={<User className="text-gray-500 mr-3 flex-shrink-0" />}>
-                                        <select value={filterSeller} onChange={(e) => setFilterSeller(e.target.value)} className="w-full bg-transparent focus:outline-none text-sm">
-                                            <option value="">Todos los Vendedores</option>
-                                            {sortedSellers.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
-                                        </select>
-                                    </FilterInput>
-                                )}
-                                <FilterInput label="Distribuidor" icon={<Truck className="text-gray-500 mr-3 flex-shrink-0" />}>
-                                    <select value={filterDistributor} onChange={(e) => setFilterDistributor(e.target.value)} className="w-full bg-transparent focus:outline-none text-sm">
-                                        <option value="">Todos los Distribuidores</option>
-                                        {sortedDistributors.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
-                                    </select>
-                                </FilterInput>
-                                {user?.role !== 'Gerente de laboratorio' && (
-                                    <FilterInput label="Laboratorio" icon={<FlaskConical className="text-gray-500 mr-3 flex-shrink-0" />}>
-                                        <select value={filterLaboratory} onChange={(e) => setFilterLaboratory(e.target.value)} className="w-full bg-transparent focus:outline-none text-sm">
-                                            <option value="">Todos los Laboratorios</option>
-                                            {sortedLaboratories.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}
-                                        </select>
-                                    </FilterInput>
-                                )}
+                                {user?.role !== 'Vendedor' && <FilterInput label="Vendedor" icon={<User className="text-gray-500 mr-3 flex-shrink-0" />}><select value={filterSeller} onChange={(e) => setFilterSeller(e.target.value)} className="w-full bg-transparent focus:outline-none text-sm"><option value="">Todos los Vendedores</option>{sortedSellers.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}</select></FilterInput>}
+                                <FilterInput label="Distribuidor" icon={<Truck className="text-gray-500 mr-3 flex-shrink-0" />}><select value={filterDistributor} onChange={(e) => setFilterDistributor(e.target.value)} className="w-full bg-transparent focus:outline-none text-sm"><option value="">Todos los Distribuidores</option>{sortedDistributors.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}</select></FilterInput>
+                                {user?.role !== 'Gerente de laboratorio' && <FilterInput label="Laboratorio" icon={<FlaskConical className="text-gray-500 mr-3 flex-shrink-0" />}><select value={filterLaboratory} onChange={(e) => setFilterLaboratory(e.target.value)} className="w-full bg-transparent focus:outline-none text-sm"><option value="">Todos los Laboratorios</option>{sortedLaboratories.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}</select></FilterInput>}
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                                <FilterInput label="Fecha de Inicio" icon={<CalendarIcon className="text-gray-500 mr-3 flex-shrink-0" size={18}/>}>
-                                    <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full bg-transparent focus:outline-none text-gray-500 text-sm"/>
-                                </FilterInput>
-                                <FilterInput label="Fecha de Fin" icon={<CalendarIcon className="text-gray-500 mr-3 flex-shrink-0" size={18}/>}>
-                                    <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full bg-transparent focus:outline-none text-gray-500 text-sm"/>
-                                </FilterInput>
+                                <FilterInput label="Fecha de Inicio" icon={<CalendarIcon className="text-gray-500 mr-3 flex-shrink-0" size={18}/>}><input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full bg-transparent focus:outline-none text-gray-500 text-sm"/></FilterInput>
+                                <FilterInput label="Fecha de Fin" icon={<CalendarIcon className="text-gray-500 mr-3 flex-shrink-0" size={18}/>}><input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full bg-transparent focus:outline-none text-gray-500 text-sm"/></FilterInput>
                             </div>
                         </div>
                     </div>
@@ -364,23 +361,20 @@ export default function ReportsView({ onNavigate, distributors, laboratories, us
                                     <th className="p-3 font-semibold text-slate-600 text-left">Fecha</th>
                                     <th className="p-3 font-semibold text-slate-600 text-left">Cliente</th>
                                     <th className="p-3 font-semibold text-slate-600 text-left">Vendedor</th>
+                                    {isProductSearchActive && <th className="p-3 font-semibold text-slate-600 text-left">Producto Coincidente (Piezas)</th>}
                                     <th className="p-3 font-semibold text-slate-600 text-right">Total</th>
                                     <th className="p-3 font-semibold text-slate-600 text-center">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {orders.map((order) => (
+                                {finalOrders.map((order) => (
                                     <tr key={order.id} className="border-b border-slate-200 hover:bg-blue-50">
                                         <td className="p-3 text-slate-700">{new Date(order.date).toLocaleDateString()}</td>
                                         <td className="p-3 font-medium text-slate-900">{order.client}</td>
                                         <td className="p-3 text-slate-700">{order.representative || 'N/A'}</td>
+                                        {isProductSearchActive && <td className="p-3 text-slate-700">{order.matchedProducts.length > 0 ? order.matchedProducts.map((p, index) => <div key={index} className="text-xs"><span className="font-semibold">{p.name}</span> ({p.qty} pz)</div>) : <span className="text-gray-400 text-xs">N/A</span>}</td>}
                                         <td className="p-3 text-right font-semibold text-slate-900">{formatCurrency(order.grandTotal)}</td>
-                                        <td className="p-3 text-center">
-                                            <div className="flex justify-center items-center gap-2">
-                                                <button onClick={() => onNavigate('orderSummary', order)} className="font-medium text-blue-600 hover:text-blue-800">Ver Detalles</button>
-                                                {canDelete && (<button onClick={() => {if (window.confirm(`¿Seguro que deseas eliminar el pedido para "${order.client}"?`)) {onDeleteOrder(order.id);}}} title="Eliminar" className="p-2 text-red-600 hover:bg-red-100 rounded-full"><Trash2 size={16} /></button>)}
-                                            </div>
-                                        </td>
+                                        <td className="p-3 text-center"><div className="flex justify-center items-center gap-2"><button onClick={() => onNavigate('orderSummary', order)} className="font-medium text-blue-600 hover:text-blue-800">Ver Detalles</button>{canDelete && (<button onClick={() => {if (window.confirm(`¿Seguro que deseas eliminar el pedido para "${order.client}"?`)) {onDeleteOrder(order.id);}}} title="Eliminar" className="p-2 text-red-600 hover:bg-red-100 rounded-full"><Trash2 size={16} /></button>)}</div></td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -388,20 +382,20 @@ export default function ReportsView({ onNavigate, distributors, laboratories, us
                     </div>
 
                     <div className="block lg:hidden space-y-4">
-                        {orders.map((order) => (<ReportCard key={order.id} {...{order, onNavigate, formatCurrency, onDeleteOrder, canDelete}} />))}
+                        {finalOrders.map((order) => (<ReportCard key={order.id} {...{order, onNavigate, formatCurrency, onDeleteOrder, canDelete, isProductSearchActive}} />))}
                     </div>
                     
-                    {!isFilterActive && hasMore && (
+                    {!isFilterActive && !isProductSearchActive && hasMore && (
                         <div className="text-center mt-8">
                             <button onClick={() => fetchOrders(true)} disabled={isLoadingMore} className="inline-flex items-center gap-2 px-6 py-2 bg-slate-700 text-white font-semibold rounded-lg shadow-md hover:bg-slate-800 disabled:bg-slate-400">
                                 {isLoadingMore ? <><Loader2 className="animate-spin" size={18} /> Cargando...</> : 'Cargar más pedidos'}
                             </button>
                         </div>
                     )}
-                    {!hasMore && orders.length > 0 && (
+                    {!hasMore && finalOrders.length > 0 && (
                         <div className="text-center text-gray-500 mt-8 py-4 border-t"><p>Has llegado al final de la lista.</p></div>
                     )}
-                    {orders.length === 0 && !isLoading && (
+                    {finalOrders.length === 0 && !isLoading && (
                         <div className="text-center text-gray-500 mt-6 py-10 border-t"><p>No se encontraron pedidos que coincidan con los filtros.</p></div>
                     )}
                 </div>
