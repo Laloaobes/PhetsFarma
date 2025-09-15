@@ -84,7 +84,6 @@ const ReportCard = ({ order, onNavigate, formatCurrency, onDeleteOrder, canDelet
     </div>
 );
 
-
 // --- Componente para definir el documento PDF ---
 const ReportPDF = ({ orders, formatCurrency, summaryData, dateRange, user }) => {
     const styles = StyleSheet.create({
@@ -146,7 +145,6 @@ const ReportPDF = ({ orders, formatCurrency, summaryData, dateRange, user }) => 
     );
 };
 
-
 // --- Custom Hook para Debounce ---
 function useDebounce(value, delay) {
     const [debouncedValue, setDebouncedValue] = useState(value);
@@ -164,15 +162,13 @@ export default function ReportsView({ onNavigate, distributors, laboratories, us
     const [isLoading, setIsLoading] = useState(true);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
     const [hasMore, setHasMore] = useState(true);
-    const [isFullDataLoadedForSearch, setIsFullDataLoadedForSearch] = useState(false);
-
     const [searchTerm, setSearchTerm] = useState('');
-    const [filterSeller, setFilterSeller] = useState(user?.role === 'Vendedor' ? user.name : '');
+    const [filterSeller, setFilterSeller] = useState(() => user?.role === 'Vendedor' ? user.name : '');
     const [filterDistributor, setFilterDistributor] = useState('');
     const [filterLaboratory, setFilterLaboratory] = useState(user?.role === 'Gerente de laboratorio' ? user.laboratory : '');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
-
+    const [currentPage, setCurrentPage] = useState(1);
     const debouncedSearchTerm = useDebounce(searchTerm, 500);
     const ORDERS_PER_PAGE = 30;
 
@@ -182,71 +178,92 @@ export default function ReportsView({ onNavigate, distributors, laboratories, us
 
     const isProductSearchActive = useMemo(() => !!debouncedSearchTerm, [debouncedSearchTerm]);
 
-    const fetchOrders = useCallback(async (loadMore = false, isInitialSearchLoad = false) => {
+    const fetchOrders = useCallback(async (loadMore = false) => {
         if (loadMore) {
             if (!hasMore || isLoadingMore) return;
             setIsLoadingMore(true);
         } else {
             setIsLoading(true);
+            setOrders([]);
+            setCurrentPage(1);
         }
 
         try {
-            let constraints = [orderBy("date", "desc")];
-            if (filterSeller) constraints.push(where("representative", "==", filterSeller));
-            if (filterDistributor) constraints.push(where("distributor", "==", filterDistributor));
-            if (filterLaboratory) constraints.push(where("laboratory", "==", filterLaboratory));
-            if (startDate) constraints.push(where("date", ">=", new Date(startDate)));
-            if (endDate) constraints.push(where("date", "<=", new Date(endDate + 'T23:59:59')));
+            if (user?.role === 'Coordinador de vendedores' && !filterSeller && !loadMore) {
+                const managedSellersNames = new Set();
+                if (user.name) managedSellersNames.add(user.name);
+                if (user.repsManaged && Array.isArray(user.repsManaged)) {
+                    user.repsManaged.forEach(repId => {
+                        const seller = representatives.find(r => r.id === repId);
+                        if (seller) managedSellersNames.add(seller.name);
+                    });
+                }
 
-            if (!isFilterActive && !isProductSearchActive) {
-                constraints.push(limit(ORDERS_PER_PAGE));
-            }
-            if (loadMore && lastVisible) {
-                constraints.push(startAfter(lastVisible));
-            }
+                if (managedSellersNames.size === 0) {
+                    setHasMore(false);
+                    setIsLoading(false);
+                    return;
+                }
 
-            const q = query(collection(db, "orders"), ...constraints);
-            const docSnapshots = await getDocs(q);
-            const newOrders = docSnapshots.docs.map(doc => ({ id: doc.id, ...doc.data(), date: doc.data().date?.toDate() || new Date() }));
-            
-            setOrders(prev => (loadMore && !isInitialSearchLoad) ? [...prev, ...newOrders] : newOrders);
-            setLastVisible(docSnapshots.docs[docSnapshots.docs.length - 1]);
-            setHasMore(isFilterActive || isProductSearchActive ? false : docSnapshots.docs.length === ORDERS_PER_PAGE);
+                const promises = Array.from(managedSellersNames).map(sellerName => {
+                    let sellerConstraints = [
+                        where("representative", "==", sellerName),
+                        orderBy("date", "desc")
+                    ];
+                    if (filterDistributor) sellerConstraints.push(where("distributor", "==", filterDistributor));
+                    if (filterLaboratory) sellerConstraints.push(where("laboratory", "==", filterLaboratory));
+                    if (startDate) sellerConstraints.push(where("date", ">=", new Date(startDate)));
+                    if (endDate) sellerConstraints.push(where("date", "<=", new Date(endDate + 'T23:59:59')));
+                    
+                    const q = query(collection(db, "orders"), ...sellerConstraints);
+                    return getDocs(q);
+                });
+
+                const snapshots = await Promise.all(promises);
+                let combinedOrders = [];
+                snapshots.forEach(snapshot => {
+                    snapshot.docs.forEach(doc => {
+                        combinedOrders.push({ id: doc.id, ...doc.data(), date: doc.data().date?.toDate() || new Date() });
+                    });
+                });
+
+                combinedOrders.sort((a, b) => b.date - a.date);
+                setOrders(combinedOrders);
+                setHasMore(false);
+
+            } else {
+                let constraints = [orderBy("date", "desc")];
+                if (filterSeller) constraints.push(where("representative", "==", filterSeller));
+                if (filterDistributor) constraints.push(where("distributor", "==", filterDistributor));
+                if (filterLaboratory) constraints.push(where("laboratory", "==", filterLaboratory));
+                if (startDate) constraints.push(where("date", ">=", new Date(startDate)));
+                if (endDate) constraints.push(where("date", "<=", new Date(endDate + 'T23:59:59')));
+                if (!isFilterActive && !isProductSearchActive) constraints.push(limit(ORDERS_PER_PAGE));
+                if (loadMore && lastVisible) constraints.push(startAfter(lastVisible));
+
+                const q = query(collection(db, "orders"), ...constraints);
+                const docSnapshots = await getDocs(q);
+                const newOrders = docSnapshots.docs.map(doc => ({ id: doc.id, ...doc.data(), date: doc.data().date?.toDate() || new Date() }));
+                
+                setOrders(prev => loadMore ? [...prev, ...newOrders] : newOrders);
+                setLastVisible(docSnapshots.docs[docSnapshots.docs.length - 1]);
+                setHasMore(isFilterActive || isProductSearchActive ? false : docSnapshots.docs.length === ORDERS_PER_PAGE);
+            }
         } catch (error) {
             console.error("Error al cargar pedidos. Revisa tus índices de Firestore:", error);
+            toast.error("Error al cargar los pedidos.");
         } finally {
             setIsLoading(false);
             setIsLoadingMore(false);
         }
-    }, [isFilterActive, isProductSearchActive, filterSeller, filterDistributor, filterLaboratory, startDate, endDate, lastVisible, hasMore, isLoadingMore]);
-
+    }, [
+        user, representatives, filterSeller, filterDistributor, filterLaboratory, startDate, endDate, 
+        lastVisible, hasMore, isLoadingMore, isFilterActive, isProductSearchActive
+    ]);
+    
     useEffect(() => {
-        setIsLoading(true);
-        setOrders([]);
-        setLastVisible(null);
-        setHasMore(true);
-        setIsFullDataLoadedForSearch(false);
         fetchOrders(false);
     }, [filterSeller, filterDistributor, filterLaboratory, startDate, endDate]);
-
-    useEffect(() => {
-        if (isProductSearchActive && !isFullDataLoadedForSearch) {
-            setIsLoading(true);
-            setOrders([]);
-            fetchOrders(false, true).then(() => {
-                setIsFullDataLoadedForSearch(true);
-            });
-        }
-        else if (!isProductSearchActive && isFullDataLoadedForSearch) {
-            setIsLoading(true);
-            setOrders([]);
-            setLastVisible(null);
-            setHasMore(true);
-            setIsFullDataLoadedForSearch(false);
-            fetchOrders(false);
-        }
-    }, [isProductSearchActive, isFullDataLoadedForSearch, fetchOrders]);
-
 
     const filteredAndEnhancedOrders = useMemo(() => {
         if (!debouncedSearchTerm) {
@@ -277,7 +294,15 @@ export default function ReportsView({ onNavigate, distributors, laboratories, us
     }, [orders, debouncedSearchTerm]);
     
     const finalOrders = isProductSearchActive ? filteredAndEnhancedOrders : orders;
-    
+
+    const handleLoadMore = () => {
+        setCurrentPage(prevPage => prevPage + 1);
+    };
+
+    const paginatedOrders = useMemo(() => {
+        return finalOrders.slice(0, currentPage * ORDERS_PER_PAGE);
+    }, [finalOrders, currentPage]);
+
     const filteredSalesTotal = useMemo(() => {
         return finalOrders.reduce((total, order) => total + (order.grandTotal || 0), 0);
     }, [finalOrders]);
@@ -287,7 +312,6 @@ export default function ReportsView({ onNavigate, distributors, laboratories, us
     
     const handleDeleteOrder = async (orderId) => {
         const promise = onDeleteOrder(orderId);
-        
         toast.promise(promise, {
             loading: 'Eliminando pedido...',
             success: () => {
@@ -333,7 +357,18 @@ export default function ReportsView({ onNavigate, distributors, laboratories, us
         toast.success('Reporte CSV descargado.');
     };
 
-    const sortedSellers = useMemo(() => [...representatives].sort((a, b) => a.name.localeCompare(b.name)), [representatives]);
+    const sortedSellers = useMemo(() => {
+        if (user?.role === 'Coordinador de vendedores') {
+            const managedRepIds = new Set(user.repsManaged || []);
+            const filteredList = representatives.filter(rep => 
+                managedRepIds.has(rep.id) || 
+                rep.name === user.name
+            );
+            return filteredList.sort((a, b) => a.name.localeCompare(b.name));
+        }
+        return [...representatives].sort((a, b) => a.name.localeCompare(b.name));
+    }, [representatives, user]);
+
     const sortedDistributors = useMemo(() => [...distributors].sort((a, b) => a.name.localeCompare(b.name)), [distributors]);
     const sortedLaboratories = useMemo(() => [...laboratories].sort((a, b) => a.name.localeCompare(b.name)), [laboratories]);
 
@@ -342,101 +377,105 @@ export default function ReportsView({ onNavigate, distributors, laboratories, us
     }
 
     return (
-        <div className="space-y-6">
-            <Toaster position="top-right" reverseOrder={false} />
-            <div className="flex flex-wrap justify-between items-center gap-4">
-                <h2 className="text-2xl lg:text-3xl font-bold text-gray-800 flex items-center"><FileText className="mr-3 text-blue-600" /> Reportes de Pedidos</h2>
-                <div className="flex items-center gap-3">
-                    <button onClick={handleCsvDownload} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700">
-                        <FileSpreadsheet size={18} /> Descargar CSV
-                    </button>
-                    <div onClick={() => { if (finalOrders.length > 0) toast.success('Iniciando descarga del PDF...'); else toast.error('No hay datos para exportar.'); }}>
-                        <PDFDownloadLink
-                            document={<ReportPDF orders={finalOrders} formatCurrency={formatCurrency} summaryData={{ totalOrders: finalOrders.length, salesTotal: filteredSalesTotal }} dateRange={startDate && endDate ? `${new Date(startDate).toLocaleDateString('es-MX')} al ${new Date(endDate).toLocaleDateString('es-MX')}` : ''} user={user} />}
-                            fileName={`reporte-pedidos-${new Date().toISOString().slice(0,10)}.pdf`}
-                            className={`flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 ${finalOrders.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        >
-                            {({ loading }) => loading ? <><Loader2 className="animate-spin h-4 w-4" /> Generando...</> : <><Download size={18} /> Descargar PDF</>}
-                        </PDFDownloadLink>
-                    </div>
-                </div>
-            </div>
+      <div className="space-y-6">
+          <Toaster position="top-right" reverseOrder={false} />
+          <div className="flex flex-wrap justify-between items-center gap-4">
+              <h2 className="text-2xl lg:text-3xl font-bold text-gray-800 flex items-center"><FileText className="mr-3 text-blue-600" /> Reportes de Pedidos</h2>
+              <div className="flex items-center gap-3">
+                  <button onClick={handleCsvDownload} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700">
+                      <FileSpreadsheet size={18} /> Descargar CSV
+                  </button>
+                  <div onClick={() => { if (finalOrders.length > 0) toast.success('Iniciando descarga del PDF...'); else toast.error('No hay datos para exportar.'); }}>
+                      <PDFDownloadLink
+                          document={<ReportPDF orders={finalOrders} formatCurrency={formatCurrency} summaryData={{ totalOrders: finalOrders.length, salesTotal: filteredSalesTotal }} dateRange={startDate && endDate ? `${new Date(startDate).toLocaleDateString('es-MX')} al ${new Date(endDate).toLocaleDateString('es-MX')}` : ''} user={user} />}
+                          fileName={`reporte-pedidos-${new Date().toISOString().slice(0,10)}.pdf`}
+                          className={`flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 ${finalOrders.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                          {({ loading }) => loading ? <><Loader2 className="animate-spin h-4 w-4" /> Generando...</> : <><Download size={18} /> Descargar PDF</>}
+                      </PDFDownloadLink>
+                  </div>
+              </div>
+          </div>
+          {(isFilterActive || isProductSearchActive) && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <SummaryCard icon={<DollarSign />} title="Ventas Totales (Filtro Actual)" value={formatCurrency(filteredSalesTotal)} color="#10B981" />
+                  <SummaryCard icon={<Hash />} title="Pedidos Encontrados" value={finalOrders.length} color="#3B82F6" />
+              </div>
+          )}
+          <div className="bg-white p-4 md:p-6 rounded-xl shadow-lg">
+              <div className="pt-6">
+                  <div className="pb-4">
+                      <h3 className="text-lg font-semibold text-gray-700 mb-4">Filtros Avanzados</h3>
+                      <div className="space-y-4">
+                          <FilterInput label="Búsqueda General" icon={<Search className="text-gray-500 mr-3" />}>
+                              <input type="text" placeholder="Buscar por cliente, vendedor, producto..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-transparent focus:outline-none text-sm"/>
+                          </FilterInput>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                              {user?.role !== 'Vendedor' && <FilterInput label="Vendedor" icon={<User className="text-gray-500 mr-3 flex-shrink-0" />}><select value={filterSeller} onChange={(e) => setFilterSeller(e.target.value)} className="w-full bg-transparent focus:outline-none text-sm"><option value="">Todos los Vendedores</option>{sortedSellers.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}</select></FilterInput>}
+                              <FilterInput label="Distribuidor" icon={<Truck className="text-gray-500 mr-3 flex-shrink-0" />}><select value={filterDistributor} onChange={(e) => setFilterDistributor(e.target.value)} className="w-full bg-transparent focus:outline-none text-sm"><option value="">Todos los Distribuidores</option>{sortedDistributors.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}</select></FilterInput>
+                              {user?.role !== 'Gerente de laboratorio' && <FilterInput label="Laboratorio" icon={<FlaskConical className="text-gray-500 mr-3 flex-shrink-0" />}><select value={filterLaboratory} onChange={(e) => setFilterLaboratory(e.target.value)} className="w-full bg-transparent focus:outline-none text-sm"><option value="">Todos los Laboratorios</option>{sortedLaboratories.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}</select></FilterInput>}
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                              <FilterInput label="Fecha de Inicio" icon={<CalendarIcon className="text-gray-500 mr-3 flex-shrink-0" size={18}/>}><input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full bg-transparent focus:outline-none text-gray-500 text-sm"/></FilterInput>
+                              <FilterInput label="Fecha de Fin" icon={<CalendarIcon className="text-gray-500 mr-3 flex-shrink-0" size={18}/>}><input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full bg-transparent focus:outline-none text-gray-500 text-sm"/></FilterInput>
+                          </div>
+                      </div>
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-700 mt-6 mb-4 border-t pt-6">Detalle de Pedidos</h3>
+                  <div className="hidden lg:block overflow-x-auto">
+                      <table className="min-w-full bg-white text-sm">
+                          <thead className="bg-slate-100">
+                              <tr className="border-b-2 border-slate-200">
+                                  <th className="p-3 font-semibold text-slate-600 text-left">Fecha</th>
+                                  <th className="p-3 font-semibold text-slate-600 text-left">Cliente</th>
+                                  <th className="p-3 font-semibold text-slate-600 text-left">Vendedor</th>
+                                  {isProductSearchActive && <th className="p-3 font-semibold text-slate-600 text-left">Producto Coincidente (Piezas)</th>}
+                                  <th className="p-3 font-semibold text-slate-600 text-right">Total</th>
+                                  <th className="p-3 font-semibold text-slate-600 text-center">Acciones</th>
+                              </tr>
+                          </thead>
+                          <tbody>
+                              {paginatedOrders.map((order) => (
+                                  <tr key={order.id} className="border-b border-slate-200 hover:bg-blue-50">
+                                      <td className="p-3 text-slate-700">{new Date(order.date).toLocaleDateString()}</td>
+                                      <td className="p-3 font-medium text-slate-900">{order.client}</td>
+                                      <td className="p-3 text-slate-700">{order.representative || 'N/A'}</td>
+                                      {isProductSearchActive && <td className="p-3 text-slate-700">{order.matchedProducts.length > 0 ? order.matchedProducts.map((p, index) => <div key={index} className="text-xs"><span className="font-semibold">{p.name}</span> ({p.qty} pz)</div>) : <span className="text-gray-400 text-xs">N/A</span>}</td>}
+                                      <td className="p-3 text-right font-semibold text-slate-900">{formatCurrency(order.grandTotal)}</td>
+                                      <td className="p-3 text-center"><div className="flex justify-center items-center gap-2"><button onClick={() => onNavigate('orderSummary', order)} className="font-medium text-blue-600 hover:text-blue-800">Ver Detalles</button>{canDelete && (<button onClick={() => {if (window.confirm(`¿Seguro que deseas eliminar el pedido para "${order.client}"?`)) {handleDeleteOrder(order.id);}}} title="Eliminar" className="p-2 text-red-600 hover:bg-red-100 rounded-full"><Trash2 size={16} /></button>)}</div></td>
+                                  </tr>
+                              ))}
+                          </tbody>
+                      </table>
+                  </div>
+                  <div className="block lg:hidden space-y-4">
+                      {paginatedOrders.map((order) => (<ReportCard key={order.id} {...{order, onNavigate, formatCurrency, onDeleteOrder: handleDeleteOrder, canDelete, isProductSearchActive}} />))}
+                  </div>
+                  
+                  {(user?.role === 'Coordinador de vendedores' && !filterSeller && paginatedOrders.length < finalOrders.length) && (
+                      <div className="text-center mt-8">
+                          <button onClick={handleLoadMore} className="inline-flex items-center gap-2 px-6 py-2 bg-slate-700 text-white font-semibold rounded-lg shadow-md hover:bg-slate-800">
+                              Cargar más pedidos
+                          </button>
+                      </div>
+                  )}
 
-            {(isFilterActive || isProductSearchActive) && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <SummaryCard icon={<DollarSign />} title="Ventas Totales (Filtro Actual)" value={formatCurrency(filteredSalesTotal)} color="#10B981" />
-                    <SummaryCard icon={<Hash />} title="Pedidos Encontrados" value={finalOrders.length} color="#3B82F6" />
-                </div>
-            )}
+                  {((user?.role !== 'Coordinador de vendedores' || filterSeller)) && !isFilterActive && !isProductSearchActive && hasMore && (
+                      <div className="text-center mt-8">
+                          <button onClick={() => fetchOrders(true)} disabled={isLoadingMore} className="inline-flex items-center gap-2 px-6 py-2 bg-slate-700 text-white font-semibold rounded-lg shadow-md hover:bg-slate-800 disabled:bg-slate-400">
+                              {isLoadingMore ? <><Loader2 className="animate-spin" size={18} /> Cargando...</> : 'Cargar más pedidos'}
+                          </button>
+                      </div>
+                  )}
 
-            <div className="bg-white p-4 md:p-6 rounded-xl shadow-lg">
-                <div className="pt-6">
-                    <div className="pb-4">
-                        <h3 className="text-lg font-semibold text-gray-700 mb-4">Filtros Avanzados</h3>
-                        <div className="space-y-4">
-                            <FilterInput label="Búsqueda General" icon={<Search className="text-gray-500 mr-3" />}>
-                                <input type="text" placeholder="Buscar por cliente, vendedor, producto..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-transparent focus:outline-none text-sm"/>
-                            </FilterInput>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {user?.role !== 'Vendedor' && <FilterInput label="Vendedor" icon={<User className="text-gray-500 mr-3 flex-shrink-0" />}><select value={filterSeller} onChange={(e) => setFilterSeller(e.target.value)} className="w-full bg-transparent focus:outline-none text-sm"><option value="">Todos los Vendedores</option>{sortedSellers.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}</select></FilterInput>}
-                                <FilterInput label="Distribuidor" icon={<Truck className="text-gray-500 mr-3 flex-shrink-0" />}><select value={filterDistributor} onChange={(e) => setFilterDistributor(e.target.value)} className="w-full bg-transparent focus:outline-none text-sm"><option value="">Todos los Distribuidores</option>{sortedDistributors.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}</select></FilterInput>
-                                {user?.role !== 'Gerente de laboratorio' && <FilterInput label="Laboratorio" icon={<FlaskConical className="text-gray-500 mr-3 flex-shrink-0" />}><select value={filterLaboratory} onChange={(e) => setFilterLaboratory(e.target.value)} className="w-full bg-transparent focus:outline-none text-sm"><option value="">Todos los Laboratorios</option>{sortedLaboratories.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}</select></FilterInput>}
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                                <FilterInput label="Fecha de Inicio" icon={<CalendarIcon className="text-gray-500 mr-3 flex-shrink-0" size={18}/>}><input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full bg-transparent focus:outline-none text-gray-500 text-sm"/></FilterInput>
-                                <FilterInput label="Fecha de Fin" icon={<CalendarIcon className="text-gray-500 mr-3 flex-shrink-0" size={18}/>}><input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full bg-transparent focus:outline-none text-gray-500 text-sm"/></FilterInput>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <h3 className="text-lg font-semibold text-gray-700 mt-6 mb-4 border-t pt-6">Detalle de Pedidos</h3>
-                    
-                    <div className="hidden lg:block overflow-x-auto">
-                        <table className="min-w-full bg-white text-sm">
-                            <thead className="bg-slate-100">
-                                <tr className="border-b-2 border-slate-200">
-                                    <th className="p-3 font-semibold text-slate-600 text-left">Fecha</th>
-                                    <th className="p-3 font-semibold text-slate-600 text-left">Cliente</th>
-                                    <th className="p-3 font-semibold text-slate-600 text-left">Vendedor</th>
-                                    {isProductSearchActive && <th className="p-3 font-semibold text-slate-600 text-left">Producto Coincidente (Piezas)</th>}
-                                    <th className="p-3 font-semibold text-slate-600 text-right">Total</th>
-                                    <th className="p-3 font-semibold text-slate-600 text-center">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {finalOrders.map((order) => (
-                                    <tr key={order.id} className="border-b border-slate-200 hover:bg-blue-50">
-                                        <td className="p-3 text-slate-700">{new Date(order.date).toLocaleDateString()}</td>
-                                        <td className="p-3 font-medium text-slate-900">{order.client}</td>
-                                        <td className="p-3 text-slate-700">{order.representative || 'N/A'}</td>
-                                        {isProductSearchActive && <td className="p-3 text-slate-700">{order.matchedProducts.length > 0 ? order.matchedProducts.map((p, index) => <div key={index} className="text-xs"><span className="font-semibold">{p.name}</span> ({p.qty} pz)</div>) : <span className="text-gray-400 text-xs">N/A</span>}</td>}
-                                        <td className="p-3 text-right font-semibold text-slate-900">{formatCurrency(order.grandTotal)}</td>
-                                        <td className="p-3 text-center"><div className="flex justify-center items-center gap-2"><button onClick={() => onNavigate('orderSummary', order)} className="font-medium text-blue-600 hover:text-blue-800">Ver Detalles</button>{canDelete && (<button onClick={() => {if (window.confirm(`¿Seguro que deseas eliminar el pedido para "${order.client}"?`)) {handleDeleteOrder(order.id);}}} title="Eliminar" className="p-2 text-red-600 hover:bg-red-100 rounded-full"><Trash2 size={16} /></button>)}</div></td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div className="block lg:hidden space-y-4">
-                        {finalOrders.map((order) => (<ReportCard key={order.id} {...{order, onNavigate, formatCurrency, onDeleteOrder: handleDeleteOrder, canDelete, isProductSearchActive}} />))}
-                    </div>
-                    
-                    {!isFilterActive && !isProductSearchActive && hasMore && (
-                        <div className="text-center mt-8">
-                            <button onClick={() => fetchOrders(true)} disabled={isLoadingMore} className="inline-flex items-center gap-2 px-6 py-2 bg-slate-700 text-white font-semibold rounded-lg shadow-md hover:bg-slate-800 disabled:bg-slate-400">
-                                {isLoadingMore ? <><Loader2 className="animate-spin" size={18} /> Cargando...</> : 'Cargar más pedidos'}
-                            </button>
-                        </div>
-                    )}
-                    {!hasMore && finalOrders.length > 0 && (
-                        <div className="text-center text-gray-500 mt-8 py-4 border-t"><p>Has llegado al final de la lista.</p></div>
-                    )}
-                    {finalOrders.length === 0 && !isLoading && (
-                        <div className="text-center text-gray-500 mt-6 py-10 border-t"><p>No se encontraron pedidos que coincidan con los filtros.</p></div>
-                    )}
-                </div>
-            </div>
-        </div>
-    );
+                  {!hasMore && finalOrders.length > 0 && currentPage * ORDERS_PER_PAGE >= finalOrders.length && (
+                      <div className="text-center text-gray-500 mt-8 py-4 border-t"><p>Has llegado al final de la lista.</p></div>
+                  )}
+                  {finalOrders.length === 0 && !isLoading && (
+                      <div className="text-center text-gray-500 mt-6 py-10 border-t"><p>No se encontraron pedidos que coincidan con los filtros.</p></div>
+                  )}
+              </div>
+          </div>
+      </div>
+  );
 }

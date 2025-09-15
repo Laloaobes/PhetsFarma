@@ -3,74 +3,52 @@ const admin = require("firebase-admin");
 
 admin.initializeApp();
 
-// --- FUNCIÓN AGREGADA: Para obtener el resumen global de ventas ---
-exports.getSalesSummary = functions.https.onCall(async (data, context) => {
-  // Opcional: Verificar que el usuario esté autenticado
-  if (!context.auth) {
-    throw new functions.https.HttpsError(
-      "unauthenticated",
-      "La función debe ser llamada por un usuario autenticado."
-    );
+// --- FUNCIÓN PARA CREAR/ACTUALIZAR USUARIO ---
+exports.saveUser = functions.https.onCall(async (data, context) => {
+  // if (context.auth.token.role !== 'Super Admin') { ... } // Opcional: Añadir verificación de rol
+
+  const {isEditing, id, email, password, name, username, role, laboratory, repsManaged} = data;
+
+  if (!email || !name || !role) {
+    throw new functions.https.HttpsError("invalid-argument", "Email, Nombre y Rol son obligatorios.");
+  }
+  if (!isEditing && !password) {
+    throw new functions.https.HttpsError("invalid-argument", "La contraseña es obligatoria para nuevos usuarios.");
   }
 
   try {
-    const ordersRef = admin.firestore().collection("orders");
-    const snapshot = await ordersRef.get();
+    const userData = {name, username: username || "", role, laboratory: laboratory || "", repsManaged: repsManaged || []};
 
-    if (snapshot.empty) {
-      return { totalGlobalSales: 0, totalGlobalOrders: 0 };
-    }
-
-    let totalSales = 0;
-    // Itera sobre todos los pedidos en el backend
-    snapshot.forEach(doc => {
-      const orderData = doc.data();
-      // Se asegura de que grandTotal sea un número antes de sumarlo
-      if (typeof orderData.grandTotal === 'number') {
-        totalSales += orderData.grandTotal;
+    if (isEditing) {
+      const user = await admin.auth().getUserByEmail(id);
+      await admin.auth().setCustomUserClaims(user.uid, {role});
+      if (password) {
+        await admin.auth().updateUser(user.uid, {password: password});
       }
-    });
-
-    const totalOrders = snapshot.size;
-
-    // Devuelve solo los valores calculados
-    return { totalGlobalSales: totalSales, totalGlobalOrders: totalOrders };
-
+      await admin.firestore().collection("users").doc(id).update(userData);
+      return {message: `Usuario ${id} actualizado.`};
+    } else {
+      const userRecord = await admin.auth().createUser({email, password, displayName: name});
+      await admin.auth().setCustomUserClaims(userRecord.uid, {role});
+      await admin.firestore().collection("users").doc(email).set(userData);
+      return {message: `Usuario ${email} creado.`};
+    }
   } catch (error) {
-    console.error("Error al calcular el resumen de ventas:", error);
-    throw new functions.https.HttpsError("internal", "No se pudo calcular el resumen de ventas.");
+    console.error("Error al guardar usuario:", error);
+    throw new functions.https.HttpsError("internal", error.message);
   }
 });
 
-
-// Tu función existente para crear usuarios
-exports.createUser = functions.https.onCall(async (data, context) => {
-  const {email, password, name, username, role, laboratory} = data;
-
-  if (!email || !password || !name || !role) {
-    throw new functions.https.HttpsError(
-      "invalid-argument",
-      "Faltan datos (email, password, name, role).",
-    );
-  }
-
+// --- FUNCIÓN PARA ELIMINAR UN USUARIO ---
+exports.deleteUser = functions.https.onCall(async (data, context) => {
+  const {email} = data;
   try {
-    await admin.auth().createUser({
-      email: email,
-      password: password,
-      displayName: name,
-    });
-
-    await admin.firestore().collection("users").doc(email).set({
-      name: name,
-      username: username,
-      role: role,
-      laboratory: laboratory || "",
-    });
-
-    return {message: `Usuario ${email} creado exitosamente.`};
+    const user = await admin.auth().getUserByEmail(email);
+    await admin.auth().deleteUser(user.uid);
+    await admin.firestore().collection("users").doc(email).delete();
+    return {result: `Usuario ${email} eliminado con éxito.`};
   } catch (error) {
-    console.error("Error al crear usuario:", error);
-    throw new functions.https.HttpsError("internal", error.message);
+    console.error("Error al eliminar usuario:", error);
+    throw new functions.https.HttpsError("internal", "Ocurrió un error al eliminar el usuario.");
   }
 });

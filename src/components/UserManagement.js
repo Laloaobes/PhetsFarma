@@ -3,7 +3,7 @@ import { Plus, Edit, Trash2, User as UserIcon, X, AlertTriangle } from 'lucide-r
 import { db } from '../firebase';
 import { collection, getDocs } from "firebase/firestore";
 import Select from 'react-select';
-import { toast } from 'react-hot-toast'; // <-- 1. IMPORTAMOS TOAST
+import { toast } from 'react-hot-toast';
 
 // --- Sub-componente Modal ---
 const Modal = ({ isOpen, onClose, title, children, size = 'lg' }) => {
@@ -34,9 +34,11 @@ const Modal = ({ isOpen, onClose, title, children, size = 'lg' }) => {
 };
 
 // --- Componente Principal ---
-export default function UserManagement({ user: loggedInUser }) {
+// MODIFICADO: Se añaden { handlers } a las props para poder usarlos
+export default function UserManagement({ user: loggedInUser, users: initialUsers, handlers }) {
   // --- Estados ---
-  const [users, setUsers] = useState([]);
+  // MODIFICADO: El estado de los usuarios ahora viene de las props
+  const [users, setUsers] = useState(initialUsers);
   const [laboratories, setLaboratories] = useState([]);
   const [representatives, setRepresentatives] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -45,24 +47,26 @@ export default function UserManagement({ user: loggedInUser }) {
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [userToModify, setUserToModify] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
+  
+  // MODIFICADO: Sincroniza el estado local cuando las props cambian
+  useEffect(() => {
+    setUsers(initialUsers);
+  }, [initialUsers]);
 
   useEffect(() => {
     if (loggedInUser.role === 'Super Admin') {
       const fetchData = async () => {
         setIsLoading(true);
         try {
-          const [usersSnapshot, representativesSnapshot] = await Promise.all([
-            getDocs(collection(db, "users")),
-            getDocs(collection(db, "representatives"))
-          ]);
+          // Se quita la carga de "users" porque ya viene de App.js
+          const representativesSnapshot = await getDocs(collection(db, "representatives"));
 
-          setUsers(usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
           setRepresentatives(representativesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
           
           setLaboratories([{ id: 1, name: 'Pets Pharma' }, { id: 2, name: 'Kiron' }, { id: 3, name: 'Vets Pharma' }]);
         } catch (error) {
           console.error("Error al cargar datos:", error);
-          toast.error("No se pudieron cargar los datos."); // Notificación de error
+          toast.error("No se pudieron cargar los datos.");
         }
         setIsLoading(false);
       };
@@ -83,7 +87,6 @@ export default function UserManagement({ user: loggedInUser }) {
     })).sort((a, b) => a.label.localeCompare(b.label)),
   [representatives]);
 
-
   if (loggedInUser.role !== 'Super Admin') {
     return (
       <div className="p-6 bg-white rounded-xl shadow-lg text-center">
@@ -93,7 +96,7 @@ export default function UserManagement({ user: loggedInUser }) {
     );
   }
   
-  // <-- 2. REEMPLAZAMOS ALERT() CON TOAST() -->
+  // MODIFICADO: Llama a los handlers de App.js en lugar de simular
   const handleSaveUser = async (e) => {
     e.preventDefault();
     
@@ -110,17 +113,16 @@ export default function UserManagement({ user: loggedInUser }) {
     try {
       const dataToSave = {
         ...userToModify,
+        // Convierte el array de objetos de react-select a un array de IDs
         repsManaged: userToModify.repsManaged?.map(r => r.value) || []
       };
 
       if (isEditing) {
-        console.log("Simulando 'updateUser'", dataToSave);
+        await handlers.handleUpdateItem(dataToSave); // Se usa el handler de App.js
         toast.success("Usuario actualizado correctamente.");
-        setUsers(users.map(u => u.id === userToModify.id ? userToModify : u));
       } else {
-        console.log("Simulando 'addUser'", dataToSave);
+        await handlers.handleAddItem(dataToSave); // Se usa el handler de App.js
         toast.success("Usuario agregado correctamente.");
-        setUsers([...users, { id: userToModify.email, ...userToModify }]);
       }
       closeFormModal();
     } catch (error) {
@@ -130,13 +132,13 @@ export default function UserManagement({ user: loggedInUser }) {
     setIsLoading(false);
   };
 
+  // MODIFICADO: Llama al handler de App.js para eliminar
   const confirmDelete = async () => {
     if (!userToModify) return;
     setIsLoading(true);
     try {
-        console.log("Simulando llamada a Cloud Function 'deleteUser'", userToModify);
+        await handlers.handleDeleteItem(userToModify.id); // Se usa el handler de App.js
         toast.success("Usuario eliminado correctamente.");
-        setUsers(users.filter(u => u.id !== userToModify.id));
         closeDeleteConfirm();
     } catch (error) {
         console.error("Error al eliminar usuario:", error);
@@ -145,7 +147,7 @@ export default function UserManagement({ user: loggedInUser }) {
     setIsLoading(false);
   };
 
-  // --- Handlers de UI ---
+  // --- Handlers de UI (sin cambios) ---
   const openAddModal = () => {
     setIsEditing(false);
     setUserToModify({ email: '', password: '', name: '', username: '', role: '', laboratory: '', repsManaged: [] });
@@ -154,9 +156,10 @@ export default function UserManagement({ user: loggedInUser }) {
   
   const openEditModal = (user) => {
     setIsEditing(true);
+    // Convierte el array de IDs de la BD al formato que react-select necesita
     const managedRepsAsOptions = (user.repsManaged || []).map(repId => 
         representativeOptions.find(opt => opt.value === repId)
-    ).filter(Boolean);
+    ).filter(Boolean); // .filter(Boolean) elimina cualquier resultado undefined si un ID no se encuentra
 
     setUserToModify({ ...user, email: user.id, password: '', repsManaged: managedRepsAsOptions });
     setIsFormModalOpen(true);
@@ -190,6 +193,7 @@ export default function UserManagement({ user: loggedInUser }) {
     return <div className="p-6 text-center"><p>Cargando...</p></div>;
   }
 
+  // --- JSX (sin cambios) ---
   return (
     <div className="p-4 md:p-6 bg-white rounded-xl shadow-lg">
       <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
@@ -199,6 +203,7 @@ export default function UserManagement({ user: loggedInUser }) {
 
       <div className="overflow-x-auto">
         <table className="min-w-full text-left">
+          {/* ... (el resto del JSX de la tabla es idéntico) ... */}
           <thead className="bg-gray-100">
             <tr>
               <th className="py-3 px-4 text-sm font-semibold text-gray-700">Email (ID)</th>

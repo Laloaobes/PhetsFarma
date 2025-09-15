@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Package, X, AlertTriangle, Loader } from 'lucide-react';
+import { Plus, Edit, Trash2, Package, X, Loader } from 'lucide-react';
 
 // --- IMPORTS DE FIREBASE ---
 // Asegúrate de que la ruta a tu archivo de configuración de Firebase sea correcta
