@@ -1,10 +1,9 @@
-// Archivo: src/firebase.js
 import { initializeApp } from "firebase/app";
-import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore"; // Importa la función de persistencia
-import { getAuth } from "firebase/auth";
-import { getFunctions } from "firebase/functions";
+import { getFirestore, enableIndexedDbPersistence, connectFirestoreEmulator } from "firebase/firestore";
+import { getAuth, connectAuthEmulator } from "firebase/auth";
+import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
 
-// Tu configuración con variables de entorno es excelente.
+// Tu configuración con variables de entorno
 const firebaseConfig = {
   apiKey: process.env.REACT_APP_API_KEY,
   authDomain: process.env.REACT_APP_AUTH_DOMAIN,
@@ -14,26 +13,36 @@ const firebaseConfig = {
   appId: process.env.REACT_APP_APP_ID
 };
 
-// Inicialización de los servicios de Firebase
+// 1. Inicializa la aplicación de Firebase
 const app = initializeApp(firebaseConfig);
+
+// 2. Obtiene las instancias de los servicios
 const db = getFirestore(app);
 const auth = getAuth(app);
-const functions = getFunctions(app, 'us-central1'); // Opcional: especifica la región si no es us-central1
+const functions = getFunctions(app, 'us-central1'); // Especifica la región para consistencia
 
-// --- OPTIMIZACIÓN DE VELOCIDAD CLAVE ---
-// Habilitar el caché offline de Firestore.
-// Esto mejora drásticamente el tiempo de carga en visitas posteriores.
+// 3. Conecta a los emuladores PRIMERO si estás en entorno de desarrollo
+// Esto asegura que cualquier configuración posterior se aplique a los emuladores.
+if (window.location.hostname === "localhost") {
+  console.log("Conectando a los emuladores de Firebase...");
+  connectFirestoreEmulator(db, 'localhost', 8080);
+  connectFunctionsEmulator(functions, 'localhost', 5001);
+  connectAuthEmulator(auth, 'http://localhost:9099');
+}
+
+// 4. Habilita la persistencia offline de Firestore DESPUÉS de conectar a los emuladores
+// De esta manera, la persistencia se habilitará tanto en producción como en el emulador.
 enableIndexedDbPersistence(db)
   .catch((err) => {
     if (err.code === 'failed-precondition') {
-      // Probablemente múltiples pestañas abiertas, la persistencia
-      // solo se puede habilitar en la primera.
-      console.warn("Múltiples pestañas abiertas, la persistencia solo se habilitará en una.");
+      // Este error es normal si tienes varias pestañas abiertas.
+      console.warn("Múltiples pestañas abiertas, la persistencia offline solo se habilitará en la primera.");
     } else if (err.code === 'unimplemented') {
-      // El navegador no soporta esta funcionalidad.
-      console.warn("El navegador actual no soporta la persistencia offline.");
+      // El navegador (ej. modo incógnito en algunos casos) no soporta esta funcionalidad.
+      console.warn("Este navegador no soporta la persistencia offline.");
     }
   });
 
-// Exporta las instancias de los servicios para usarlas en toda la app
+// 5. Exporta las instancias ya configuradas de los servicios
 export { db, auth, functions };
+
