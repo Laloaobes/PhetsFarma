@@ -1,10 +1,10 @@
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
-const cors = require("cors")({origin: true}); // Habilita CORS para todas las peticiones
+const cors = require("cors")({origin: true});
 
 admin.initializeApp();
 
-// --- FUNCIÓN PARA CREAR/ACTUALIZAR USUARIO ---
+// --- FUNCIÓN PARA CREAR/ACTUALIZAR USUARIO (Sin cambios) ---
 exports.saveUser = functions.https.onCall(async (data, context) => {
   const {isEditing, id, email, password, name, username, role, laboratory, repsManaged} = data;
   if (!email || !name || !role) {
@@ -35,7 +35,7 @@ exports.saveUser = functions.https.onCall(async (data, context) => {
   }
 });
 
-// --- FUNCIÓN PARA ELIMINAR UN USUARIO ---
+// --- FUNCIÓN PARA ELIMINAR UN USUARIO (Sin cambios) ---
 exports.deleteUser = functions.https.onCall(async (data, context) => {
   const {email} = data;
   try {
@@ -49,16 +49,29 @@ exports.deleteUser = functions.https.onCall(async (data, context) => {
   }
 });
 
-// --- FUNCIÓN DE REPORTE POR PRODUCTO CON CORS ---
+// --- FUNCIÓN DE REPORTE POR PRODUCTO - VERSIÓN FINAL CON LOGS ---
 exports.calculateProductReport = functions.https.onRequest((req, res) => {
   cors(req, res, async () => {
+    // Log para ver el cuerpo completo de la petición
+    console.log("Petición recibida. Body completo:", JSON.stringify(req.body));
+
+    // Los datos enviados por httpsCallable vienen en req.body.data
+    // Se añade una comprobación para asegurar que `data` existe
+    const data = req.body.data;
+    if (!data) {
+        console.error("Error: El objeto 'data' no fue encontrado en el cuerpo de la petición.");
+        return res.status(400).send({ error: "Petición mal formada. Faltó el objeto 'data'." });
+    }
+    
+    const { productNames, startDate, endDate, filterSeller, filterDistributor, filterLaboratory } = data;
+
+    console.log("Iniciando reporte con los siguientes datos:", JSON.stringify(data));
+
+    if (!productNames || productNames.length === 0 || !filterLaboratory) {
+      return res.status(400).send({ error: "La selección de laboratorio y al menos un producto es obligatoria." });
+    }
+
     try {
-      const { productNames, startDate, endDate, filterSeller, filterDistributor, filterLaboratory } = req.body.data;
-
-      if (!productNames || productNames.length === 0 || !filterLaboratory) {
-        return res.status(400).send({ error: "La selección de laboratorio y al menos un producto es obligatoria." });
-      }
-
       const db = admin.firestore();
       let ordersQuery = db.collection("orders");
 
@@ -73,6 +86,7 @@ exports.calculateProductReport = functions.https.onRequest((req, res) => {
       }
     
       const snapshot = await ordersQuery.get();
+      console.log(`Consulta a Firestore realizada. Se encontraron ${snapshot.size} pedidos.`);
 
       if (snapshot.empty) {
         return res.status(200).send({ data: [] });
@@ -84,8 +98,8 @@ exports.calculateProductReport = functions.https.onRequest((req, res) => {
           productName: name,
           totalQty: 0,
           totalAmount: 0,
-          sellers: new Set(),
-          distributors: new Set()
+          salesBySeller: {},
+          salesByDistributor: {}
         };
       });
 
@@ -100,8 +114,16 @@ exports.calculateProductReport = functions.https.onRequest((req, res) => {
               
               report[productName].totalQty += qty;
               report[productName].totalAmount += itemTotal;
-              if (order.representative) report[productName].sellers.add(order.representative);
-              if (order.distributor) report[productName].distributors.add(order.distributor);
+
+              const seller = order.representative || 'N/A';
+              const distributor = order.distributor || 'N/A';
+
+              if(seller) {
+                report[productName].salesBySeller[seller] = (report[productName].salesBySeller[seller] || 0) + qty;
+              }
+              if(distributor) {
+                report[productName].salesByDistributor[distributor] = (report[productName].salesByDistributor[distributor] || 0) + qty;
+              }
             }
           });
         }
@@ -109,10 +131,11 @@ exports.calculateProductReport = functions.https.onRequest((req, res) => {
       
       const finalReport = Object.values(report).map(item => ({
           ...item,
-          sellers: Array.from(item.sellers),
-          distributors: Array.from(item.distributors)
+          salesBySeller: Object.entries(item.salesBySeller).map(([sellerName, qty]) => ({ sellerName, qty })),
+          salesByDistributor: Object.entries(item.salesByDistributor).map(([distributorName, qty]) => ({ distributorName, qty }))
       }));
-
+      
+      console.log("Reporte final a devolver:", JSON.stringify(finalReport));
       return res.status(200).send({ data: finalReport });
 
     } catch (error) {
