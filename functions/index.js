@@ -1,6 +1,6 @@
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
-const cors = require("cors")({origin: true});
+const cors = require("cors")({origin: true}); // Habilita CORS para todas las peticiones
 
 admin.initializeApp();
 
@@ -49,12 +49,10 @@ exports.deleteUser = functions.https.onCall(async (data, context) => {
   }
 });
 
-// --- FUNCIÓN DE REPORTE POR PRODUCTO CON CORS Y MANEJO DE ERRORES MEJORADO ---
+// --- FUNCIÓN DE REPORTE POR PRODUCTO CON CORS ---
 exports.calculateProductReport = functions.https.onRequest((req, res) => {
   cors(req, res, async () => {
     try {
-      console.log("Iniciando 'calculateProductReport'. Body recibido:", JSON.stringify(req.body));
-      
       const { productNames, startDate, endDate, filterSeller, filterDistributor, filterLaboratory } = req.body.data;
 
       if (!productNames || productNames.length === 0 || !filterLaboratory) {
@@ -75,7 +73,6 @@ exports.calculateProductReport = functions.https.onRequest((req, res) => {
       }
     
       const snapshot = await ordersQuery.get();
-      console.log(`Consulta a Firestore completada. Se encontraron ${snapshot.size} pedidos.`);
 
       if (snapshot.empty) {
         return res.status(200).send({ data: [] });
@@ -85,10 +82,10 @@ exports.calculateProductReport = functions.https.onRequest((req, res) => {
       productNames.forEach(name => {
         report[name] = {
           productName: name,
-          totalquantity: 0,
+          totalQty: 0,
           totalAmount: 0,
-          salesBySeller: {},
-          salesByDistributor: {}
+          sellers: new Set(),
+          distributors: new Set()
         };
       });
 
@@ -98,22 +95,13 @@ exports.calculateProductReport = functions.https.onRequest((req, res) => {
           order.items.forEach((item) => {
             if (productNames.includes(item.productName)) {
               const productName = item.productName;
-              const quantity = parseInt(item.quantity, 10) || 0;
-              const itemTotal = Number(item.total) || (Number(item.price) || 0) * quantity;
+              const qty = parseInt(item.qty, 10) || 0;
+              const itemTotal = Number(item.total) || (Number(item.price) || 0) * qty;
               
-              report[productName].totalquantity += quantity;
+              report[productName].totalQty += qty;
               report[productName].totalAmount += itemTotal;
-
-              const seller = order.representative || 'N/A';
-              const distributor = order.distributor || 'N/A';
-
-              if(seller) {
-                report[productName].salesBySeller[seller] = (report[productName].salesBySeller[seller] || 0) + quantity;
-              }
-
-              if(distributor) {
-                report[productName].salesByDistributor[distributor] = (report[productName].salesByDistributor[distributor] || 0) + quantity;
-              }
+              if (order.representative) report[productName].sellers.add(order.representative);
+              if (order.distributor) report[productName].distributors.add(order.distributor);
             }
           });
         }
@@ -121,11 +109,10 @@ exports.calculateProductReport = functions.https.onRequest((req, res) => {
       
       const finalReport = Object.values(report).map(item => ({
           ...item,
-          salesBySeller: Object.entries(item.salesBySeller).map(([sellerName, quantity]) => ({ sellerName, quantity })),
-          salesByDistributor: Object.entries(item.salesByDistributor).map(([distributorName, quantity]) => ({ distributorName, quantity }))
+          sellers: Array.from(item.sellers),
+          distributors: Array.from(item.distributors)
       }));
 
-      console.log("Reporte final generado:", JSON.stringify(finalReport));
       return res.status(200).send({ data: finalReport });
 
     } catch (error) {
