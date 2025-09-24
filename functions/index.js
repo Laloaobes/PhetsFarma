@@ -4,7 +4,7 @@ const cors = require("cors")({origin: true});
 
 admin.initializeApp();
 
-// --- FUNCIÓN PARA CREAR/ACTUALIZAR USUARIO ---
+// --- FUNCIÓN PARA CREAR/ACTUALIZAR USUARIO (Sin cambios) ---
 exports.saveUser = functions.https.onCall(async (data, context) => {
   const {isEditing, id, email, password, name, username, role, laboratory, repsManaged} = data;
   if (!email || !name || !role) {
@@ -35,7 +35,7 @@ exports.saveUser = functions.https.onCall(async (data, context) => {
   }
 });
 
-// --- FUNCIÓN PARA ELIMINAR UN USUARIO ---
+// --- FUNCIÓN PARA ELIMINAR UN USUARIO (Sin cambios) ---
 exports.deleteUser = functions.https.onCall(async (data, context) => {
   const {email} = data;
   try {
@@ -49,7 +49,7 @@ exports.deleteUser = functions.https.onCall(async (data, context) => {
   }
 });
 
-// --- FUNCIÓN DE REPORTE POR PRODUCTO CON CORS Y VERIFICACIÓN DE AUTH ---
+// --- FUNCIÓN DE REPORTE CON CORS Y VERIFICACIÓN DE AUTH ---
 exports.calculateProductReport = functions.https.onRequest((req, res) => {
   cors(req, res, async () => {
     // --- PASO CLAVE: VERIFICACIÓN MANUAL DE AUTENTICACIÓN ---
@@ -77,7 +77,6 @@ exports.calculateProductReport = functions.https.onRequest((req, res) => {
       return;
     }
     // --- FIN DE LA VERIFICACIÓN DE AUTENTICACIÓN ---
-
 
     try {
       const { productNames, startDate, endDate, filterSeller, filterDistributor, filterLaboratory } = req.body.data;
