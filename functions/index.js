@@ -4,74 +4,88 @@ const cors = require("cors")({origin: true});
 
 admin.initializeApp();
 
-// --- FUNCIÓN PARA CREAR/ACTUALIZAR USUARIO (Sin cambios) ---
+// --- FUNCIÓN PARA CREAR/ACTUALIZAR USUARIO ---
 exports.saveUser = functions.https.onCall(async (data, context) => {
-  const {isEditing, id, email, password, name, username, role, laboratory, repsManaged} = data;
-  if (!email || !name || !role) {
-    throw new functions.https.HttpsError("invalid-argument", "Email, Nombre y Rol son obligatorios.");
-  }
-  if (!isEditing && !password) {
-    throw new functions.https.HttpsError("invalid-argument", "La contraseña es obligatoria para nuevos usuarios.");
-  }
-  try {
-    const userData = {name, username: username || "", role, laboratory: laboratory || "", repsManaged: repsManaged || []};
-    if (isEditing) {
-      const user = await admin.auth().getUserByEmail(id);
-      await admin.auth().setCustomUserClaims(user.uid, {role});
-      if (password) {
-        await admin.auth().updateUser(user.uid, {password: password});
-      }
-      await admin.firestore().collection("users").doc(id).update(userData);
-      return {message: `Usuario ${id} actualizado.`};
-    } else {
-      const userRecord = await admin.auth().createUser({email, password, displayName: name});
-      await admin.auth().setCustomUserClaims(userRecord.uid, {role});
-      await admin.firestore().collection("users").doc(email).set(userData);
-      return {message: `Usuario ${email} creado.`};
-    }
-  } catch (error) {
-    console.error("Error al guardar usuario:", error);
-    throw new functions.https.HttpsError("internal", error.message);
-  }
+  const {isEditing, id, email, password, name, username, role, laboratory, repsManaged} = data;
+  if (!email || !name || !role) {
+    throw new functions.https.HttpsError("invalid-argument", "Email, Nombre y Rol son obligatorios.");
+  }
+  if (!isEditing && !password) {
+    throw new functions.https.HttpsError("invalid-argument", "La contraseña es obligatoria para nuevos usuarios.");
+  }
+  try {
+    const userData = {name, username: username || "", role, laboratory: laboratory || "", repsManaged: repsManaged || []};
+    if (isEditing) {
+      const user = await admin.auth().getUserByEmail(id);
+      await admin.auth().setCustomUserClaims(user.uid, {role});
+      if (password) {
+        await admin.auth().updateUser(user.uid, {password: password});
+      }
+      await admin.firestore().collection("users").doc(id).update(userData);
+      return {message: `Usuario ${id} actualizado.`};
+    } else {
+      const userRecord = await admin.auth().createUser({email, password, displayName: name});
+      await admin.auth().setCustomUserClaims(userRecord.uid, {role});
+      await admin.firestore().collection("users").doc(email).set(userData);
+      return {message: `Usuario ${email} creado.`};
+    }
+  } catch (error) {
+    console.error("Error al guardar usuario:", error);
+    throw new functions.https.HttpsError("internal", error.message);
+  }
 });
 
-// --- FUNCIÓN PARA ELIMINAR UN USUARIO (Sin cambios) ---
+// --- FUNCIÓN PARA ELIMINAR UN USUARIO ---
 exports.deleteUser = functions.https.onCall(async (data, context) => {
-  const {email} = data;
-  try {
-    const user = await admin.auth().getUserByEmail(email);
-    await admin.auth().deleteUser(user.uid);
-    await admin.firestore().collection("users").doc(email).delete();
-    return {result: `Usuario ${email} eliminado con éxito.`};
-  } catch (error) {
-    console.error("Error al eliminar usuario:", error);
-    throw new functions.https.HttpsError("internal", "Ocurrió un error al eliminar el usuario.");
-  }
+  const {email} = data;
+  try {
+    const user = await admin.auth().getUserByEmail(email);
+    await admin.auth().deleteUser(user.uid);
+    await admin.firestore().collection("users").doc(email).delete();
+    return {result: `Usuario ${email} eliminado con éxito.`};
+  } catch (error) {
+    console.error("Error al eliminar usuario:", error);
+    throw new functions.https.HttpsError("internal", "Ocurrió un error al eliminar el usuario.");
+  }
 });
 
-// --- FUNCIÓN DE REPORTE POR PRODUCTO - VERSIÓN FINAL CON LOGS ---
+// --- FUNCIÓN DE REPORTE POR PRODUCTO CON CORS Y VERIFICACIÓN DE AUTH ---
 exports.calculateProductReport = functions.https.onRequest((req, res) => {
   cors(req, res, async () => {
-    // Log para ver el cuerpo completo de la petición
-    console.log("Petición recibida. Body completo:", JSON.stringify(req.body));
-
-    // Los datos enviados por httpsCallable vienen en req.body.data
-    // Se añade una comprobación para asegurar que `data` existe
-    const data = req.body.data;
-    if (!data) {
-        console.error("Error: El objeto 'data' no fue encontrado en el cuerpo de la petición.");
-        return res.status(400).send({ error: "Petición mal formada. Faltó el objeto 'data'." });
+    // --- PASO CLAVE: VERIFICACIÓN MANUAL DE AUTENTICACIÓN ---
+    if (!req.headers.authorization || !req.headers.authorization.startsWith("Bearer ")) {
+      console.error("No se encontró el token de autorización. La petición no está autenticada.");
+      res.status(403).send("Unauthorized");
+      return;
     }
-    
-    const { productNames, startDate, endDate, filterSeller, filterDistributor, filterLaboratory } = data;
 
-    console.log("Iniciando reporte con los siguientes datos:", JSON.stringify(data));
-
-    if (!productNames || productNames.length === 0 || !filterLaboratory) {
-      return res.status(400).send({ error: "La selección de laboratorio y al menos un producto es obligatoria." });
+    let idToken;
+    if (req.headers.authorization && req.headers.authorization.startsWith("Bearer ")) {
+      idToken = req.headers.authorization.split("Bearer ")[1];
+    } else {
+      console.error("Token de autorización mal formado.");
+      res.status(403).send("Unauthorized");
+      return;
     }
 
     try {
+      // Verificar el token con Firebase Admin SDK
+      await admin.auth().verifyIdToken(idToken);
+    } catch (error) {
+      console.error("Error al verificar el token de autorización:", error);
+      res.status(403).send("Unauthorized");
+      return;
+    }
+    // --- FIN DE LA VERIFICACIÓN DE AUTENTICACIÓN ---
+
+
+    try {
+      const { productNames, startDate, endDate, filterSeller, filterDistributor, filterLaboratory } = req.body.data;
+
+      if (!productNames || productNames.length === 0 || !filterLaboratory) {
+        return res.status(400).send({ error: "La selección de laboratorio y al menos un producto es obligatoria." });
+      }
+
       const db = admin.firestore();
       let ordersQuery = db.collection("orders");
 
@@ -86,7 +100,6 @@ exports.calculateProductReport = functions.https.onRequest((req, res) => {
       }
     
       const snapshot = await ordersQuery.get();
-      console.log(`Consulta a Firestore realizada. Se encontraron ${snapshot.size} pedidos.`);
 
       if (snapshot.empty) {
         return res.status(200).send({ data: [] });
@@ -134,8 +147,7 @@ exports.calculateProductReport = functions.https.onRequest((req, res) => {
           salesBySeller: Object.entries(item.salesBySeller).map(([sellerName, qty]) => ({ sellerName, qty })),
           salesByDistributor: Object.entries(item.salesByDistributor).map(([distributorName, qty]) => ({ distributorName, qty }))
       }));
-      
-      console.log("Reporte final a devolver:", JSON.stringify(finalReport));
+
       return res.status(200).send({ data: finalReport });
 
     } catch (error) {
