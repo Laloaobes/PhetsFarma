@@ -1,6 +1,6 @@
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
-// Se elimina la dependencia de 'cors' ya que onCall lo maneja automáticamente
+// SE ELIMINA: Ya no se necesita 'cors' porque onCall lo maneja automáticamente.
 // const cors = require("cors")({origin: true}); 
 
 admin.initializeApp();
@@ -50,9 +50,9 @@ exports.deleteUser = functions.https.onCall(async (data, context) => {
   }
 });
 
-// --- FUNCIÓN DE REPORTE POR PRODUCTO - CORREGIDA A onCall ---
+// --- MODIFICADO: La función vuelve a ser de tipo onCall, la forma correcta y segura ---
 exports.calculateProductReport = functions.https.onCall(async (data, context) => {
-  // onCall verifica la autenticación automáticamente. Si no hay usuario, la función falla.
+  // onCall verifica la autenticación automáticamente. Si el usuario no está logueado, falla.
   if (!context.auth) {
     throw new functions.https.HttpsError(
       "unauthenticated",
@@ -60,6 +60,7 @@ exports.calculateProductReport = functions.https.onCall(async (data, context) =>
     );
   }
 
+  // Los datos llegan directamente en el objeto 'data'
   const { productNames, startDate, endDate, filterSeller, filterDistributor, filterLaboratory } = data;
 
   if (!productNames || productNames.length === 0 || !filterLaboratory) {
@@ -132,6 +133,7 @@ exports.calculateProductReport = functions.https.onCall(async (data, context) =>
         salesByDistributor: Object.entries(item.salesByDistributor).map(([distributorName, qty]) => ({ distributorName, qty }))
     }));
 
+    // En onCall, simplemente se retorna el resultado
     return finalReport;
 
   } catch (error) {
