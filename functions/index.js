@@ -1,11 +1,9 @@
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
-// SE ELIMINA: Ya no se necesita 'cors' porque onCall lo maneja automáticamente.
-// const cors = require("cors")({origin: true}); 
 
 admin.initializeApp();
 
-// --- FUNCIÓN PARA CREAR/ACTUALIZAR USUARIO (Sin cambios) ---
+// --- FUNCIÓN PARA CREAR/ACTUALIZAR USUARIO ---
 exports.saveUser = functions.https.onCall(async (data, context) => {
   const {isEditing, id, email, password, name, username, role, laboratory, repsManaged} = data;
   if (!email || !name || !role) {
@@ -36,7 +34,7 @@ exports.saveUser = functions.https.onCall(async (data, context) => {
   }
 });
 
-// --- FUNCIÓN PARA ELIMINAR UN USUARIO (Sin cambios) ---
+// --- FUNCIÓN PARA ELIMINAR UN USUARIO ---
 exports.deleteUser = functions.https.onCall(async (data, context) => {
   const {email} = data;
   try {
@@ -50,24 +48,21 @@ exports.deleteUser = functions.https.onCall(async (data, context) => {
   }
 });
 
-// --- MODIFICADO: La función vuelve a ser de tipo onCall, la forma correcta y segura ---
+// --- FUNCIÓN DE REPORTE POR PRODUCTO (CORREGIDA A onCall) ---
 exports.calculateProductReport = functions.https.onCall(async (data, context) => {
-  // onCall verifica la autenticación automáticamente. Si el usuario no está logueado, falla.
+  // onCall verifica la autenticación automáticamente. Si no hay usuario, falla.
   if (!context.auth) {
+    console.error("Intento de llamada no autenticado.");
     throw new functions.https.HttpsError(
       "unauthenticated",
       "El usuario debe estar autenticado para generar este reporte."
     );
   }
 
-  // Los datos llegan directamente en el objeto 'data'
   const { productNames, startDate, endDate, filterSeller, filterDistributor, filterLaboratory } = data;
 
   if (!productNames || productNames.length === 0 || !filterLaboratory) {
-    throw new functions.https.HttpsError(
-      "invalid-argument",
-      "La selección de laboratorio y al menos un producto es obligatoria."
-    );
+    throw new functions.https.HttpsError("invalid-argument", "La selección de laboratorio y al menos un producto es obligatoria.");
   }
 
   try {
@@ -87,7 +82,7 @@ exports.calculateProductReport = functions.https.onCall(async (data, context) =>
     const snapshot = await ordersQuery.get();
 
     if (snapshot.empty) {
-      return []; // Devuelve un array vacío si no hay resultados
+      return []; 
     }
 
     const report = {};
@@ -103,7 +98,8 @@ exports.calculateProductReport = functions.https.onCall(async (data, context) =>
 
     snapshot.forEach((doc) => {
       const order = doc.data();
-      if (order.items && Array.isArray(order.items)) {
+      const orderDate = order.date;
+      if (order.items && Array.isArray(order.items) && orderDate && typeof orderDate.toDate === 'function') { // Verificación de fecha
         order.items.forEach((item) => {
           if (productNames.includes(item.productName)) {
             const productName = item.productName;
@@ -132,13 +128,12 @@ exports.calculateProductReport = functions.https.onCall(async (data, context) =>
         salesBySeller: Object.entries(item.salesBySeller).map(([sellerName, qty]) => ({ sellerName, qty })),
         salesByDistributor: Object.entries(item.salesByDistributor).map(([distributorName, qty]) => ({ distributorName, qty }))
     }));
-
-    // En onCall, simplemente se retorna el resultado
+    
     return finalReport;
 
   } catch (error) {
-    console.error("Error crítico al generar el reporte:", error);
-    throw new functions.https.HttpsError("internal", "Ocurrió un error interno al generar el reporte.");
+    console.error("Error CRÍTICO al generar el reporte:", error);
+    throw new functions.https.HttpsError("internal", "Ocurrió un error interno al generar el reporte.", error.message);
   }
 });
 
