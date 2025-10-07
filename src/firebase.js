@@ -1,9 +1,9 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore, enableIndexedDbPersistence, connectFirestoreEmulator } from "firebase/firestore";
-import { getAuth, connectAuthEmulator } from "firebase/auth";
-import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
+import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
+import { getFunctions } from "firebase/functions";
+import { getAuth } from "firebase/auth";
 
-// Tu configuración con variables de entorno
+// Tu configuración de Firebase
 const firebaseConfig = {
   apiKey: process.env.REACT_APP_API_KEY,
   authDomain: process.env.REACT_APP_AUTH_DOMAIN,
@@ -13,36 +13,21 @@ const firebaseConfig = {
   appId: process.env.REACT_APP_APP_ID
 };
 
-// 1. Inicializa la aplicación de Firebase
+// Inicialización de los servicios
 const app = initializeApp(firebaseConfig);
-
-// 2. Obtiene las instancias de los servicios
 const db = getFirestore(app);
 const auth = getAuth(app);
-const functions = getFunctions(app, 'us-central1'); // Especifica la región para consistencia
+const functions = getFunctions(app, 'us-central1');
 
-// 3. Conecta a los emuladores PRIMERO si estás en entorno de desarrollo
-// Esto asegura que cualquier configuración posterior se aplique a los emuladores.
-if (window.location.hostname === "localhost") {
-  console.log("Conectando a los emuladores de Firebase...");
-  connectFirestoreEmulator(db, 'localhost', 8080);
-  connectFunctionsEmulator(functions, 'localhost', 5001);
-  connectAuthEmulator(auth, 'http://localhost:9099');
-}
-
-// 4. Habilita la persistencia offline de Firestore DESPUÉS de conectar a los emuladores
-// De esta manera, la persistencia se habilitará tanto en producción como en el emulador.
+// Habilitar la persistencia offline para mejorar la velocidad de carga
 enableIndexedDbPersistence(db)
   .catch((err) => {
     if (err.code === 'failed-precondition') {
-      // Este error es normal si tienes varias pestañas abiertas.
-      console.warn("Múltiples pestañas abiertas, la persistencia offline solo se habilitará en la primera.");
+      console.warn("Múltiples pestañas abiertas, la persistencia de Firestore solo se habilita en una.");
     } else if (err.code === 'unimplemented') {
-      // El navegador (ej. modo incógnito en algunos casos) no soporta esta funcionalidad.
-      console.warn("Este navegador no soporta la persistencia offline.");
+      console.warn("Este navegador no soporta la persistencia offline de Firestore.");
     }
   });
 
-// 5. Exporta las instancias ya configuradas de los servicios
+// Exporta las instancias de los servicios para usarlas en toda la app
 export { db, auth, functions };
-

@@ -3,7 +3,7 @@ const admin = require("firebase-admin");
 
 admin.initializeApp();
 
-// --- FUNCIÓN PARA CREAR/ACTUALIZAR USUARIO ---
+// --- FUNCIÓN PARA CREAR/ACTUALIZAR USUARIO (Tu código original) ---
 exports.saveUser = functions.https.onCall(async (data, context) => {
   const {isEditing, id, email, password, name, username, role, laboratory, repsManaged} = data;
   if (!email || !name || !role) {
@@ -34,7 +34,7 @@ exports.saveUser = functions.https.onCall(async (data, context) => {
   }
 });
 
-// --- FUNCIÓN PARA ELIMINAR UN USUARIO ---
+// --- FUNCIÓN PARA ELIMINAR UN USUARIO (Tu código original) ---
 exports.deleteUser = functions.https.onCall(async (data, context) => {
   const {email} = data;
   try {
@@ -48,92 +48,90 @@ exports.deleteUser = functions.https.onCall(async (data, context) => {
   }
 });
 
-// --- FUNCIÓN DE REPORTE POR PRODUCTO (CORREGIDA A onCall) ---
+// --- FUNCIÓN DE REPORTE POR PRODUCTO - CORREGIDA A onCall ---
 exports.calculateProductReport = functions.https.onCall(async (data, context) => {
-  // onCall verifica la autenticación automáticamente. Si no hay usuario, falla.
-  if (!context.auth) {
-    console.error("Intento de llamada no autenticado.");
-    throw new functions.https.HttpsError(
-      "unauthenticated",
-      "El usuario debe estar autenticado para generar este reporte."
-    );
-  }
-
-  const { productNames, startDate, endDate, filterSeller, filterDistributor, filterLaboratory } = data;
-
-  if (!productNames || productNames.length === 0 || !filterLaboratory) {
-    throw new functions.https.HttpsError("invalid-argument", "La selección de laboratorio y al menos un producto es obligatoria.");
-  }
-
-  try {
-    const db = admin.firestore();
-    let ordersQuery = db.collection("orders");
-
-    ordersQuery = ordersQuery.where("laboratory", "==", filterLaboratory);
-    if (filterSeller) ordersQuery = ordersQuery.where("representative", "==", filterSeller);
-    if (filterDistributor) ordersQuery = ordersQuery.where("distributor", "==", filterDistributor);
-    if (startDate) ordersQuery = ordersQuery.where("date", ">=", new Date(startDate));
-    if (endDate) {
-      const endOfDay = new Date(endDate);
-      endOfDay.setHours(23, 59, 59, 999);
-      ordersQuery = ordersQuery.where("date", "<=", endOfDay);
+    // onCall verifica la autenticación automáticamente. Si no hay usuario, la función falla.
+    if (!context.auth) {
+        throw new functions.https.HttpsError(
+        "unauthenticated",
+        "El usuario debe estar autenticado para generar este reporte."
+        );
     }
-  
-    const snapshot = await ordersQuery.get();
+    
+    try {
+      const { productNames, startDate, endDate, filterSeller, filterDistributor, filterLaboratory } = data;
 
-    if (snapshot.empty) {
-      return []; 
-    }
-
-    const report = {};
-    productNames.forEach(name => {
-      report[name] = {
-        productName: name,
-        totalQty: 0,
-        totalAmount: 0,
-        salesBySeller: {},
-        salesByDistributor: {}
-      };
-    });
-
-    snapshot.forEach((doc) => {
-      const order = doc.data();
-      const orderDate = order.date;
-      if (order.items && Array.isArray(order.items) && orderDate && typeof orderDate.toDate === 'function') { // Verificación de fecha
-        order.items.forEach((item) => {
-          if (productNames.includes(item.productName)) {
-            const productName = item.productName;
-            const qty = parseInt(item.qty, 10) || 0;
-            const itemTotal = Number(item.total) || (Number(item.price) || 0) * qty;
-            
-            report[productName].totalQty += qty;
-            report[productName].totalAmount += itemTotal;
-
-            const seller = order.representative || 'N/A';
-            const distributor = order.distributor || 'N/A';
-
-            if(seller !== 'N/A') {
-              report[productName].salesBySeller[seller] = (report[productName].salesBySeller[seller] || 0) + qty;
-            }
-            if(distributor !== 'N/A') {
-              report[productName].salesByDistributor[distributor] = (report[productName].salesByDistributor[distributor] || 0) + qty;
-            }
-          }
-        });
+      if (!productNames || productNames.length === 0 || !filterLaboratory) {
+        throw new functions.https.HttpsError("invalid-argument", "La selección de laboratorio y al menos un producto es obligatoria.");
       }
-    });
-    
-    const finalReport = Object.values(report).map(item => ({
-        ...item,
-        salesBySeller: Object.entries(item.salesBySeller).map(([sellerName, qty]) => ({ sellerName, qty })),
-        salesByDistributor: Object.entries(item.salesByDistributor).map(([distributorName, qty]) => ({ distributorName, qty }))
-    }));
-    
-    return finalReport;
 
-  } catch (error) {
-    console.error("Error CRÍTICO al generar el reporte:", error);
-    throw new functions.https.HttpsError("internal", "Ocurrió un error interno al generar el reporte.", error.message);
-  }
+      const db = admin.firestore();
+      let ordersQuery = db.collection("orders");
+
+      ordersQuery = ordersQuery.where("laboratory", "==", filterLaboratory);
+      if (filterSeller) ordersQuery = ordersQuery.where("representative", "==", filterSeller);
+      if (filterDistributor) ordersQuery = ordersQuery.where("distributor", "==", filterDistributor);
+      if (startDate) ordersQuery = ordersQuery.where("date", ">=", new Date(startDate));
+      if (endDate) {
+        const endOfDay = new Date(endDate);
+        endOfDay.setHours(23, 59, 59, 999);
+        ordersQuery = ordersQuery.where("date", "<=", endOfDay);
+      }
+    
+      const snapshot = await ordersQuery.get();
+
+      if (snapshot.empty) {
+        return []; // Con onCall, simplemente retornas el array
+      }
+
+      const report = {};
+      productNames.forEach(name => {
+        report[name] = {
+          productName: name,
+          totalQty: 0,
+          totalAmount: 0,
+          salesBySeller: {},
+          salesByDistributor: {}
+        };
+      });
+
+      snapshot.forEach((doc) => {
+        const order = doc.data();
+        if (order.items && Array.isArray(order.items)) {
+          order.items.forEach((item) => {
+            if (productNames.includes(item.productName)) {
+              const productName = item.productName;
+              const qty = parseInt(item.quantity, 10) || 0; 
+              const itemTotal = Number(item.total) || (Number(item.price) || 0) * qty;
+              
+              report[productName].totalQty += qty;
+              report[productName].totalAmount += itemTotal;
+
+              const seller = order.representative || 'N/A';
+              const distributor = order.distributor || 'N/A';
+
+              if(seller !== 'N/A') {
+                report[productName].salesBySeller[seller] = (report[productName].salesBySeller[seller] || 0) + qty;
+              }
+
+              if(distributor !== 'N/A') {
+                report[productName].salesByDistributor[distributor] = (report[productName].salesByDistributor[distributor] || 0) + qty;
+              }
+            }
+          });
+        }
+      });
+      
+      const finalReport = Object.values(report).map(item => ({
+          ...item,
+          salesBySeller: Object.entries(item.salesBySeller).map(([sellerName, qty]) => ({ sellerName, qty })),
+          salesByDistributor: Object.entries(item.salesByDistributor).map(([distributorName, qty]) => ({ distributorName, qty }))
+      }));
+      
+      return finalReport; // Con onCall, retornas el resultado directamente
+
+    } catch (error) {
+      console.error("Error crítico al generar el reporte:", error);
+      throw new functions.https.HttpsError("internal", "Ocurrió un error interno al generar el reporte.", error);
+    }
 });
-
