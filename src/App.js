@@ -10,12 +10,11 @@ import GenericManagement from './components/GenericManagement';
 import ProductManagement from './components/ProductManagement';
 import UserManagement from './components/UserManagement';
 import Login from './components/Login';
+import { Loader2 } from 'lucide-react';
 
 // ---- IMPORTS DE FIREBASE ----
-// Se añaden getAuth, onAuthStateChanged y signOut para la autenticación real
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
 import { db } from './firebase';
-// Se añade getDoc para poder leer el perfil del usuario al iniciar sesión
 import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, setDoc, getDoc } from "firebase/firestore";
 
 // --- DATOS LOCALES ---
@@ -28,63 +27,48 @@ const initialData = {
 };
 
 export default function App() {
-    // Estados de la aplicación
     const [user, setUser] = useState(null);
     const [currentView, setCurrentView] = useState('login');
     const [lastView, setLastView] = useState('login');
     const [currentOrder, setCurrentOrder] = useState(null);
-    const [isLoadingUser, setIsLoadingUser] = useState(true); // Para mostrar pantalla de carga inicial
+    const [isLoadingUser, setIsLoadingUser] = useState(true);
 
-    // ---- ESTADOS PARA DATOS DE FIRESTORE ----
     const [clients, setClients] = useState([]);
     const [representatives, setRepresentatives] = useState([]);
     const [distributors, setDistributors] = useState([]);
     const [users, setUsers] = useState([]);
     const [products, setProducts] = useState([]);
 
-    // --- SECCIÓN DE AUTENTICACIÓN CORREGIDA ---
     useEffect(() => {
         const auth = getAuth();
-        // onAuthStateChanged es el listener oficial de Firebase.
-        // Se ejecuta cuando el usuario inicia sesión, cierra sesión o al cargar la página.
         const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
             if (firebaseUser) {
-                // El usuario está autenticado en Firebase.
-                // Ahora, buscamos su perfil en nuestra colección "users" para obtener su rol y datos.
                 const userDocRef = doc(db, "users", firebaseUser.email);
                 const userDocSnap = await getDoc(userDocRef);
 
                 if (userDocSnap.exists()) {
-                    // Si encontramos su perfil, lo guardamos en el estado 'user'.
                     setUser({
                         uid: firebaseUser.uid,
                         email: firebaseUser.email,
                         ...userDocSnap.data()
                     });
-                    setCurrentView("orderForm"); // Vista por defecto al iniciar sesión
+                    setCurrentView("orderForm");
                 } else {
-                    // Si no tiene perfil en Firestore, lo deslogueamos para evitar errores.
                     console.error("Usuario autenticado pero sin perfil en Firestore.");
-                    signOut(auth);
+                    await signOut(auth);
                 }
             } else {
-                // El usuario no está autenticado.
                 setUser(null);
                 setCurrentView("login");
             }
-            setIsLoadingUser(false); // Terminamos la carga inicial
+            setIsLoadingUser(false);
         });
 
-        // Limpiamos el listener cuando el componente se desmonta.
         return () => unsubscribe();
     }, []);
 
-    // --- SECCIÓN DE CARGA DE DATOS CORREGIDA ---
-    // Este useEffect ahora DEPENDE del estado del 'user'.
-    // Solo se ejecutará para cargar datos CUANDO el usuario haya iniciado sesión.
     useEffect(() => {
         if (!user) {
-            // Si no hay usuario, limpiamos los datos para que no se muestren datos de sesiones anteriores.
             setProducts([]);
             setClients([]);
             setRepresentatives([]);
@@ -93,8 +77,6 @@ export default function App() {
             return;
         }
 
-        // Si hay un usuario, activamos los listeners para escuchar datos en tiempo real.
-        // Estos ahora pasarán las reglas de seguridad porque el usuario está autenticado.
         console.log("Usuario autenticado. Cargando datos de Firestore...");
         const unsubProducts = onSnapshot(collection(db, "products"), (snapshot) => setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
         const unsubClients = onSnapshot(collection(db, "clients"), (snapshot) => setClients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
@@ -102,7 +84,6 @@ export default function App() {
         const unsubDists = onSnapshot(collection(db, "distributors"), (snapshot) => setDistributors(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
         const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
 
-        // La función de limpieza se ejecutará cuando el usuario cierre sesión (porque 'user' cambiará a null)
         return () => {
             console.log("Cerrando sesión. Desconectando listeners de Firestore.");
             unsubProducts();
@@ -111,7 +92,7 @@ export default function App() {
             unsubDists();
             unsubUsers();
         };
-    }, [user]); // La dependencia clave que activa/desactiva la carga de datos
+    }, [user]);
 
     const handleLogout = () => {
         const auth = getAuth();
@@ -134,7 +115,6 @@ export default function App() {
         }
     };
     
-    // La lógica de genericHandlers y userHandlers no necesita cambios.
     const genericHandlers = (key) => ({
         handleAddItem: async (item) => {
             try {
@@ -184,21 +164,18 @@ export default function App() {
     };
 
     const renderView = () => {
-        // Muestra una pantalla de carga mientras se verifica la sesión del usuario.
         if (isLoadingUser) {
             return (
-                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-                    Cargando...
+                <div className="flex justify-center items-center h-screen">
+                    <Loader2 className="animate-spin h-12 w-12 text-blue-600" />
                 </div>
             );
         }
 
-        // Si no hay usuario, muestra el componente de Login.
         if (!user) {
             return <Login />;
         }
 
-        // Si hay usuario, muestra la vista correspondiente.
         switch (currentView) {
             case 'orderForm':
                 return <OrderForm onSaveOrder={handleSaveOrder} products={products} clients={clients} representatives={representatives} distributors={distributors} laboratories={initialData.laboratories} user={user} onSaveNewClient={genericHandlers('clients').handleAddItem} onSaveNewRepresentative={genericHandlers('representatives').handleAddItem} onSaveNewDistributor={genericHandlers('distributors').handleAddItem} />;

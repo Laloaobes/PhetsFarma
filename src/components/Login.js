@@ -1,119 +1,109 @@
 import React, { useState } from 'react';
 import { LogIn } from 'lucide-react';
-// 1. Importar las funciones necesarias de Firebase
 import { getAuth, signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
-import { db } from '../firebase';
-import { doc, getDoc } from "firebase/firestore";
+import toast from 'react-hot-toast';
 
-// 2. Aceptar la prop onLogin
-export default function Login({ onLogin }) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
+export default function Login() {
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    setMessage('');
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!email || !password) {
+            toast.error("Por favor, ingresa correo y contraseña.");
+            return;
+        }
 
-    const auth = getAuth();
-    try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
+        setIsLoading(true);
+        const auth = getAuth();
+        try {
+            // Inicia sesión con Firebase. Si tiene éxito, el listener en App.js se activará.
+            await signInWithEmailAndPassword(auth, email, password);
+            toast.success('¡Bienvenido!');
+            // No es necesario llamar a onLogin ni manejar el estado del usuario aquí.
+        } catch (error) {
+            console.error("Error al iniciar sesión:", error.code);
+            if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+                toast.error("Correo o contraseña incorrectos.");
+            } else {
+                toast.error("Ocurrió un error al iniciar sesión.");
+            }
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
-      const userDocRef = doc(db, "users", user.email);
-      const userDoc = await getDoc(userDocRef);
+    const handlePasswordReset = async () => {
+        if (!email) {
+            toast.error("Por favor, ingresa tu email para restablecer la contraseña.");
+            return;
+        }
 
-      if (userDoc.exists()) {
-        // 3. ¡CORRECCIÓN! Llamar a onLogin con los datos del perfil del usuario
-        onLogin({ email: user.email, ...userDoc.data() });
-      } else {
-        setError("No se encontraron datos de perfil para este usuario.");
-        auth.signOut();
-      }
-    } catch (error) {
-      setError("Email o contraseña incorrectos.");
-    }
-  };
-
-  const handlePasswordReset = async () => {
-    if (!email) {
-      setError("Por favor, ingresa tu email para restablecer la contraseña.");
-      return;
-    }
-    setError('');
-    setMessage('');
-
-    const auth = getAuth();
-    try {
-      await sendPasswordResetEmail(auth, email);
-      setMessage("Se ha enviado un enlace para restablecer tu contraseña a tu correo.");
-    } catch (error) {
-      setError("No se pudo enviar el correo. Verifica que el email sea correcto.");
-    }
-  };
-
-
-  return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
-      <div className="w-full max-w-sm p-8 space-y-8 bg-white rounded-xl shadow-lg">
-        <div className="text-center">
-            <img
-              src="/grupogarvo.png"
-              alt="Logo"
-              className="w-40 mx-auto mb-4"
-              onError={(e) => { e.currentTarget.src = "https://placehold.co/200x80?text=Logo"; }}
-            />
-          <h1 className="text-2xl font-bold text-gray-800">Iniciar Sesión</h1>
-          <p className="text-gray-500">Accede al sistema de pedidos</p>
-        </div>
-        <form className="space-y-6" onSubmit={handleSubmit}>
-          <div>
-            <label className="text-sm font-bold text-gray-600 block">Correo Electrónico</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full p-3 mt-1 text-gray-800 bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              
-              required
-            />
-          </div>
-          <div>
-            <label className="text-sm font-bold text-gray-600 block">Contraseña</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full p-3 mt-1 text-gray-800 bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+        const auth = getAuth();
+        const promise = sendPasswordResetEmail(auth, email);
         
-              required
-            />
-          </div>
+        toast.promise(promise, {
+            loading: 'Enviando correo...',
+            success: 'Se ha enviado un enlace para restablecer tu contraseña.',
+            error: 'No se pudo enviar el correo. Verifica que el email sea correcto.',
+        });
+    };
 
-          {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-          {message && <p className="text-green-500 text-sm text-center">{message}</p>}
+    return (
+        <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
+            <div className="w-full max-w-sm p-8 space-y-8 bg-white rounded-xl shadow-lg">
+                <div className="text-center">
+                    <img
+                        src="/grupogarvo.png"
+                        alt="Logo"
+                        className="w-40 mx-auto mb-4"
+                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                    />
+                    <h1 className="text-2xl font-bold text-gray-800">Iniciar Sesión</h1>
+                    <p className="text-gray-500">Accede al sistema de pedidos</p>
+                </div>
+                <form className="space-y-6" onSubmit={handleSubmit}>
+                    <div>
+                        <label className="text-sm font-bold text-gray-600 block">Correo Electrónico</label>
+                        <input
+                            type="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            className="w-full p-3 mt-1 text-gray-800 bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            required
+                        />
+                    </div>
+                    <div>
+                        <label className="text-sm font-bold text-gray-600 block">Contraseña</label>
+                        <input
+                            type="password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            className="w-full p-3 mt-1 text-gray-800 bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            required
+                        />
+                    </div>
 
-          <button
-            type="submit"
-            className="w-full flex justify-center items-center bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 transition"
-          >
-            <LogIn className="mr-2" size={20} />
-            Acceder
-          </button>
-        </form>
-        
-        <div className="text-center">
-          <button
-            onClick={handlePasswordReset}
-            className="text-sm text-blue-600 hover:underline"
-          >
-            ¿Olvidaste tu contraseña?
-          </button>
+                    <button
+                        type="submit"
+                        disabled={isLoading}
+                        className="w-full flex justify-center items-center bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 transition disabled:bg-blue-300"
+                    >
+                        {isLoading ? <Loader2 className="animate-spin mr-2" size={20} /> : <LogIn className="mr-2" size={20} />}
+                        {isLoading ? "Ingresando..." : "Acceder"}
+                    </button>
+                </form>
+                
+                <div className="text-center">
+                    <button
+                        onClick={handlePasswordReset}
+                        className="text-sm text-blue-600 hover:underline"
+                    >
+                        ¿Olvidaste tu contraseña?
+                    </button>
+                </div>
+            </div>
         </div>
-
-      </div>
-    </div>
-  );
+    );
 }
