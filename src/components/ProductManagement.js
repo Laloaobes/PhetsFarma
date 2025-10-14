@@ -6,7 +6,7 @@ import { Plus, Edit, Trash2, Package, X, Loader } from 'lucide-react';
 import { db } from '../firebase'; 
 import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc } from "firebase/firestore";
 
-// Componente genérico para modales (sin cambios)
+// Componente genérico para modales
 const Modal = ({ onClose, title, children }) => (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
     <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md relative">
@@ -21,11 +21,10 @@ const Modal = ({ onClose, title, children }) => (
   </div>
 );
 
-// El componente ahora solo necesita 'laboratories' y 'user' como props
 export default function ProductManagement({ laboratories, user }) {
   // --- ESTADOS DEL COMPONENTE ---
-  const [products, setProducts] = useState([]); // ¡NUEVO! Estado local para los productos
-  const [isLoading, setIsLoading] = useState(true); // ¡NUEVO! Estado para la carga inicial
+  const [products, setProducts] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentItem, setCurrentItem] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -35,21 +34,18 @@ export default function ProductManagement({ laboratories, user }) {
   const [productToDelete, setProductToDelete] = useState(null);
   const [showAll, setShowAll] = useState(false);
   
-  // --- ¡NUEVO! CARGA DE DATOS DESDE FIRESTORE ---
+  // --- CARGA DE DATOS DESDE FIRESTORE ---
   useEffect(() => {
     setIsLoading(true);
-    // Se suscribe a la colección 'products' para obtener datos en tiempo real
     const unsubscribe = onSnapshot(collection(db, "products"), (snapshot) => {
       const productsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setProducts(productsData);
       setIsLoading(false);
     });
-
-    // Se desuscribe al desmontar el componente para evitar fugas de memoria
     return () => unsubscribe();
   }, []);
 
-  // --- ¡NUEVO! MANEJADORES DE DATOS INTERNOS (CRUD) ---
+  // --- MANEJADORES DE DATOS INTERNOS (CRUD) ---
   const handleAddItem = async (item) => {
     try {
       const { id, ...itemData } = item;
@@ -80,13 +76,13 @@ export default function ProductManagement({ laboratories, user }) {
     }
   };
   
-  // Lógica de permisos (sin cambios)
+  // Lógica de permisos
   const canAddProduct = user && ['Super Admin', 'Admin', 'Coordinador de vendedores', 'Gerente de laboratorio'].includes(user.role);
   const canEditProductDetails = user && ['Super Admin', 'Admin', 'Coordinador de vendedores'].includes(user.role);
   const canEditProductPrice = user && ['Super Admin', 'Admin'].includes(user.role);
   const canDeleteProduct = user && ['Super Admin', 'Admin', 'Coordinador de vendedores'].includes(user.role);
 
-  // Lógica de filtrado (sin cambios)
+  // Lógica de filtrado
   let sourceList = [];
   if (showAll) {
     sourceList = products;
@@ -104,9 +100,9 @@ export default function ProductManagement({ laboratories, user }) {
     ? sourceList.filter(product => product.laboratory === user.laboratory)
     : sourceList;
 
-  // --- MANEJADORES DE UI (ACTUALIZADOS PARA USAR HANDLERS INTERNOS) ---
+  // --- MANEJADORES DE UI ---
   const handleShowAll = () => {
-    setShowAll(true);
+    setShowAll(prevShowAll => !prevShowAll);
     setSelectedLaboratory('');
   };
 
@@ -122,7 +118,7 @@ export default function ProductManagement({ laboratories, user }) {
 
   const confirmDelete = () => {
     if (productToDelete) {
-      handleDeleteItem(productToDelete.id); // Llama al handler interno
+      handleDeleteItem(productToDelete.id);
     }
     setIsDeleteConfirmOpen(false);
     setProductToDelete(null);
@@ -157,9 +153,9 @@ export default function ProductManagement({ laboratories, user }) {
       return;
     }
     if (isEditing) {
-      handleUpdateItem(currentItem); // Llama al handler interno
+      handleUpdateItem(currentItem);
     } else {
-      handleAddItem(currentItem); // Llama al handler interno
+      handleAddItem(currentItem);
     }
     closeModal();
   };
@@ -205,7 +201,7 @@ export default function ProductManagement({ laboratories, user }) {
           onClick={handleShowAll}
           className="w-full md:w-auto px-4 py-2 bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-700 transition-colors"
         >
-          Mostrar Todos los Productos
+          {showAll ? 'Ocultar Todos los Productos' : 'Mostrar Todos los Productos'}
         </button>
       </div>
       
@@ -252,26 +248,64 @@ export default function ProductManagement({ laboratories, user }) {
           No se encontraron productos con los filtros aplicados.
         </p>
       )}
-
       {!isLoading && products.length > 0 && filteredProducts.length === 0 && !selectedLaboratory && !showAll && (
         <p className="text-center text-gray-500 mt-6 p-4 border rounded-lg bg-gray-50">
           Por favor, selecciona un laboratorio o presiona "Mostrar Todos" para comenzar.
         </p>
       )}
       
-      {/* Modales (sin cambios en su lógica interna) */}
-      {isModalOpen && (
+      {/* Modales */}
+      {isModalOpen && currentItem && (
         <Modal onClose={closeModal} title={isEditing ? 'Editar Producto' : 'Agregar Producto'}>
             <form onSubmit={handleSave} className="space-y-4">
-                {/* ... contenido del formulario ... */}
+                <div>
+                    <label htmlFor="code" className="block text-sm font-medium text-gray-700 mb-1">SKU (Código)</label>
+                    <input type="text" id="code" name="code" value={currentItem.code} onChange={handleChange} required className="w-full p-2 border rounded-lg" disabled={isEditing && !canEditProductDetails}/>
+                </div>
+                <div>
+                    <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">Nombre del Producto</label>
+                    <input type="text" id="name" name="name" value={currentItem.name} onChange={handleChange} required className="w-full p-2 border rounded-lg" disabled={isEditing && !canEditProductDetails}/>
+                </div>
+                <div>
+                    <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+                    <textarea id="description" name="description" value={currentItem.description} onChange={handleChange} rows="3" className="w-full p-2 border rounded-lg" disabled={isEditing && !canEditProductDetails}></textarea>
+                </div>
+                <div>
+                    <label htmlFor="price" className="block text-sm font-medium text-gray-700 mb-1">Precio</label>
+                    <input type="number" step="0.01" id="price" name="price" value={currentItem.price} onChange={handleChange} className="w-full p-2 border rounded-lg" disabled={isEditing && !canEditProductPrice}/>
+                </div>
+                <div>
+                    <label htmlFor="laboratory" className="block text-sm font-medium text-gray-700 mb-1">Laboratorio</label>
+                    <select id="laboratory" name="laboratory" value={currentItem.laboratory} onChange={handleChange} required className="w-full p-2 border rounded-lg" disabled={isEditing && !canEditProductDetails}>
+                        <option value="">Seleccione un laboratorio</option>
+                        {laboratories.map(lab => (
+                            <option key={lab.id} value={lab.name}>{lab.name}</option>
+                        ))}
+                    </select>
+                </div>
+                <div className="flex justify-end pt-4">
+                    <button type="submit" className="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700">
+                        {isEditing ? 'Guardar Cambios' : 'Crear Producto'}
+                    </button>
+                </div>
             </form>
         </Modal>
       )}
       
-      {isDeleteConfirmOpen && (
+      {isDeleteConfirmOpen && productToDelete && (
         <Modal onClose={cancelDelete} title="Confirmar Eliminación">
             <div className='text-center'>
-                {/* ... contenido del modal de confirmación ... */}
+                <p className="text-gray-700 mb-6">
+                    ¿Estás seguro de que deseas eliminar el producto <strong className="font-semibold">{productToDelete.name}</strong>? Esta acción no se puede deshacer.
+                </p>
+                <div className="flex justify-center space-x-4">
+                    <button onClick={cancelDelete} className="px-6 py-2 bg-gray-300 text-gray-800 font-semibold rounded-lg hover:bg-gray-400">
+                        Cancelar
+                    </button>
+                    <button onClick={confirmDelete} className="px-6 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700">
+                        Eliminar
+                    </button>
+                </div>
             </div>
         </Modal>
       )}

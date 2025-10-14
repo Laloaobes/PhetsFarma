@@ -1,9 +1,8 @@
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
 import { getFunctions } from "firebase/functions";
 import { getAuth } from "firebase/auth";
 
-// Tu configuración de Firebase
 const firebaseConfig = {
   apiKey: process.env.REACT_APP_API_KEY,
   authDomain: process.env.REACT_APP_AUTH_DOMAIN,
@@ -13,13 +12,17 @@ const firebaseConfig = {
   appId: process.env.REACT_APP_APP_ID
 };
 
-// Inicialización de los servicios
-const app = initializeApp(firebaseConfig);
+// --- LÓGICA DE INICIALIZACIÓN ROBUSTA ---
+// Esto previene que Firebase se inicialice múltiples veces
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+
 const db = getFirestore(app);
 const auth = getAuth(app);
 const functions = getFunctions(app, 'us-central1');
 
-// Habilitar la persistencia offline para mejorar la velocidad de carga
+// --- SE ELIMINÓ EL BLOQUE DE CONEXIÓN A EMULADORES ---
+
+// Habilitar la persistencia offline
 enableIndexedDbPersistence(db)
   .catch((err) => {
     if (err.code === 'failed-precondition') {
@@ -29,5 +32,6 @@ enableIndexedDbPersistence(db)
     }
   });
 
-// Exporta las instancias de los servicios para usarlas en toda la app
+// Exporta las instancias de los servicios
 export { db, auth, functions };
+

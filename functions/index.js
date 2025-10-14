@@ -3,7 +3,7 @@ const admin = require("firebase-admin");
 
 admin.initializeApp();
 
-// --- FUNCIÓN PARA CREAR/ACTUALIZAR USUARIO (Tu código original) ---
+// --- FUNCIÓN PARA CREAR/ACTUALIZAR USUARIO (Sin cambios) ---
 exports.saveUser = functions.https.onCall(async (data, context) => {
   const {isEditing, id, email, password, name, username, role, laboratory, repsManaged} = data;
   if (!email || !name || !role) {
@@ -34,7 +34,7 @@ exports.saveUser = functions.https.onCall(async (data, context) => {
   }
 });
 
-// --- FUNCIÓN PARA ELIMINAR UN USUARIO (Tu código original) ---
+// --- FUNCIÓN PARA ELIMINAR UN USUARIO (Sin cambios) ---
 exports.deleteUser = functions.https.onCall(async (data, context) => {
   const {email} = data;
   try {
@@ -48,15 +48,15 @@ exports.deleteUser = functions.https.onCall(async (data, context) => {
   }
 });
 
-// --- FUNCIÓN DE REPORTE POR PRODUCTO - CORREGIDA A onCall ---
+// --- FUNCIÓN DE REPORTE POR PRODUCTO - CON DEPURACIÓN ADICIONAL ---
 exports.calculateProductReport = functions.https.onCall(async (data, context) => {
-    // onCall verifica la autenticación automáticamente. Si no hay usuario, la función falla.
     if (!context.auth) {
-        throw new functions.https.HttpsError(
-        "unauthenticated",
-        "El usuario debe estar autenticado para generar este reporte."
-        );
+        console.error("Intento de ejecución no autenticado.");
+        throw new functions.https.HttpsError("unauthenticated", "El usuario debe estar autenticado.");
     }
+    
+    console.log("Iniciando 'calculateProductReport' para el usuario:", context.auth.uid);
+    console.log("Datos recibidos:", JSON.stringify(data));
     
     try {
       const { productNames, startDate, endDate, filterSeller, filterDistributor, filterLaboratory } = data;
@@ -79,16 +79,17 @@ exports.calculateProductReport = functions.https.onCall(async (data, context) =>
       }
     
       const snapshot = await ordersQuery.get();
+      console.log(`Consulta a Firestore completada. Se encontraron ${snapshot.size} pedidos.`);
 
       if (snapshot.empty) {
-        return []; // Con onCall, simplemente retornas el array
+        return [];
       }
 
       const report = {};
       productNames.forEach(name => {
         report[name] = {
           productName: name,
-          totalQty: 0,
+          totalquantity: 0,
           totalAmount: 0,
           salesBySeller: {},
           salesByDistributor: {}
@@ -97,25 +98,28 @@ exports.calculateProductReport = functions.https.onCall(async (data, context) =>
 
       snapshot.forEach((doc) => {
         const order = doc.data();
+        // Verificación de seguridad para la fecha
+        const orderDate = order.date && typeof order.date.toDate === 'function' ? order.date.toDate() : new Date();
+
         if (order.items && Array.isArray(order.items)) {
           order.items.forEach((item) => {
             if (productNames.includes(item.productName)) {
               const productName = item.productName;
-              const qty = parseInt(item.quantity, 10) || 0; 
-              const itemTotal = Number(item.total) || (Number(item.price) || 0) * qty;
+              const quantity = parseInt(item.quantity, 10) || 0; 
+              const itemTotal = Number(item.total) || (Number(item.price) || 0) * quantity;
               
-              report[productName].totalQty += qty;
+              report[productName].totalquantity += quantity;
               report[productName].totalAmount += itemTotal;
 
               const seller = order.representative || 'N/A';
               const distributor = order.distributor || 'N/A';
 
               if(seller !== 'N/A') {
-                report[productName].salesBySeller[seller] = (report[productName].salesBySeller[seller] || 0) + qty;
+                report[productName].salesBySeller[seller] = (report[productName].salesBySeller[seller] || 0) + quantity;
               }
 
               if(distributor !== 'N/A') {
-                report[productName].salesByDistributor[distributor] = (report[productName].salesByDistributor[distributor] || 0) + qty;
+                report[productName].salesByDistributor[distributor] = (report[productName].salesByDistributor[distributor] || 0) + quantity;
               }
             }
           });
@@ -124,14 +128,15 @@ exports.calculateProductReport = functions.https.onCall(async (data, context) =>
       
       const finalReport = Object.values(report).map(item => ({
           ...item,
-          salesBySeller: Object.entries(item.salesBySeller).map(([sellerName, qty]) => ({ sellerName, qty })),
-          salesByDistributor: Object.entries(item.salesByDistributor).map(([distributorName, qty]) => ({ distributorName, qty }))
+          salesBySeller: Object.entries(item.salesBySeller).map(([sellerName, quantity]) => ({ sellerName, quantity })),
+          salesByDistributor: Object.entries(item.salesByDistributor).map(([distributorName, quantity]) => ({ distributorName, quantity }))
       }));
       
-      return finalReport; // Con onCall, retornas el resultado directamente
+      console.log("Reporte final generado:", JSON.stringify(finalReport));
+      return finalReport;
 
     } catch (error) {
       console.error("Error crítico al generar el reporte:", error);
-      throw new functions.https.HttpsError("internal", "Ocurrió un error interno al generar el reporte.", error);
+      throw new functions.https.HttpsError("internal", "Ocurrió un error interno al generar el reporte.", error.message);
     }
 });
