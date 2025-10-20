@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LogIn } from 'lucide-react';
+import { LogIn, Loader2 } from 'lucide-react';
 import { getAuth, signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 import toast from 'react-hot-toast';
 
@@ -18,10 +18,8 @@ export default function Login() {
         setIsLoading(true);
         const auth = getAuth();
         try {
-            // Inicia sesión con Firebase. Si tiene éxito, el listener en App.js se activará.
             await signInWithEmailAndPassword(auth, email, password);
             toast.success('¡Bienvenido!');
-            // No es necesario llamar a onLogin ni manejar el estado del usuario aquí.
         } catch (error) {
             console.error("Error al iniciar sesión:", error.code);
             if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {

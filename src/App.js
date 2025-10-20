@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Loader2 } from 'lucide-react';
 
 // Importa componentes de la aplicación
 import AdminPanel from './components/AdminPanel';
@@ -10,7 +11,6 @@ import GenericManagement from './components/GenericManagement';
 import ProductManagement from './components/ProductManagement';
 import UserManagement from './components/UserManagement';
 import Login from './components/Login';
-import { Loader2 } from 'lucide-react';
 
 // ---- IMPORTS DE FIREBASE ----
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
@@ -52,19 +52,20 @@ export default function App() {
                         email: firebaseUser.email,
                         ...userDocSnap.data()
                     });
-                    setCurrentView("orderForm");
+                    // ✅ CORRECCIÓN: No cambiar la vista aquí directamente.
+                    // El estado del usuario controlará qué se renderiza.
                 } else {
                     console.error("Usuario autenticado pero sin perfil en Firestore.");
                     await signOut(auth);
                 }
             } else {
                 setUser(null);
-                setCurrentView("login");
             }
             setIsLoadingUser(false);
         });
 
         return () => unsubscribe();
+    // ✅ CORRECCIÓN: El array de dependencias debe estar vacío para que se ejecute solo una vez.
     }, []);
 
     useEffect(() => {
@@ -75,6 +76,11 @@ export default function App() {
             setDistributors([]);
             setUsers([]);
             return;
+        }
+
+        // Si hay un usuario, la vista por defecto debe ser orderForm
+        if (currentView === 'login') {
+            setCurrentView('orderForm');
         }
 
         console.log("Usuario autenticado. Cargando datos de Firestore...");
@@ -92,11 +98,13 @@ export default function App() {
             unsubDists();
             unsubUsers();
         };
-    }, [user]);
+    }, [user, currentView]); // Depende de user para activar/desactivar
 
     const handleLogout = () => {
         const auth = getAuth();
-        signOut(auth);
+        signOut(auth).then(() => {
+            setCurrentView('login'); // Asegurarse de volver al login al cerrar sesión
+        });
     };
 
     const handleNavigate = (view, order = null) => {
@@ -163,15 +171,8 @@ export default function App() {
         },
     };
 
-    const renderView = () => {
-        if (isLoadingUser) {
-            return (
-                <div className="flex justify-center items-center h-screen">
-                    <Loader2 className="animate-spin h-12 w-12 text-blue-600" />
-                </div>
-            );
-        }
-
+    const renderContent = () => {
+        // ✅ CORRECCIÓN: La lógica de renderizado ahora es más simple
         if (!user) {
             return <Login />;
         }
@@ -204,11 +205,17 @@ export default function App() {
 
     return (
         <div className="min-h-screen bg-gray-100 flex flex-col">
-            {user && currentView !== 'login' && (
+            {user && (
                 <AdminPanel onNavigate={handleNavigate} onLogout={handleLogout} currentView={currentView} user={user} />
             )}
             <main className="container mx-auto p-4 md:p-6 flex-grow">
-                {renderView()}
+                {isLoadingUser ? (
+                    <div className="flex justify-center items-center h-full">
+                        <Loader2 className="animate-spin h-12 w-12 text-blue-600" />
+                    </div>
+                ) : (
+                    renderContent()
+                )}
             </main>
         </div>
     );
