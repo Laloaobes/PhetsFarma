@@ -249,14 +249,7 @@ export default function ProductReportView({
                         <label className="text-sm font-medium text-gray-600 mb-1 block">Distribuidor (Opcional)</label>
                         <Select options={distributorOptions} isClearable value={distributorOptions.find(o => o.value === filterDistributor)} onChange={opt => setFilterDistributor(opt ? opt.value : '')} placeholder="Todos" />
                     </div>
-                    <div>
-                        <label className="text-sm font-medium text-gray-600 mb-1 block">Fecha de Inicio</label>
-                        <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full bg-gray-100 p-3 rounded-lg focus:outline-none text-sm h-[38px]" />
-                    </div>
-                    <div>
-                        <label className="text-sm font-medium text-gray-600 mb-1 block">Fecha de Fin</label>
-                        <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full bg-gray-100 p-3 rounded-lg focus:outline-none text-sm h-[38px]" />
-                    </div>
+                    
                 </div>
                 <div className="flex justify-end pt-2">
                     <button onClick={handleGenerateReport} disabled={isLoading || !selectedLab || selectedProducts.length === 0} className="flex items-center justify-center gap-2 px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 disabled:bg-blue-300 transition-colors">
