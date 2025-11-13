@@ -8,16 +8,7 @@ import { toast } from 'react-hot-toast';
 // --- Sub-componente Modal ---
 const Modal = ({ isOpen, onClose, title, children, size = 'lg' }) => {
   if (!isOpen) return null;
-
-  const sizeClasses = {
-    sm: 'max-w-sm',
-    md: 'max-w-md',
-    lg: 'max-w-lg',
-    xl: 'max-w-xl',
-    '2xl': 'max-w-2xl',
-    '3xl': 'max-w-3xl',
-  };
-
+  const sizeClasses = { sm: 'max-w-sm', md: 'max-w-md', lg: 'max-w-lg', xl: 'max-w-xl', '2xl': 'max-w-2xl', '3xl': 'max-w-3xl' };
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
       <div className={`bg-white p-6 rounded-lg shadow-xl w-full ${sizeClasses[size]} relative`}> 
@@ -34,21 +25,20 @@ const Modal = ({ isOpen, onClose, title, children, size = 'lg' }) => {
 };
 
 // --- Componente Principal ---
-// MODIFICADO: Se añaden { handlers } a las props para poder usarlos
 export default function UserManagement({ user: loggedInUser, users: initialUsers, handlers }) {
-  // --- Estados ---
-  // MODIFICADO: El estado de los usuarios ahora viene de las props
   const [users, setUsers] = useState(initialUsers);
   const [laboratories, setLaboratories] = useState([]);
   const [representatives, setRepresentatives] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true); // Para la carga inicial de datos
+  
+  // --- CAMBIO 1: Nuevo estado para controlar el envío del formulario ---
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [userToModify, setUserToModify] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   
-  // MODIFICADO: Sincroniza el estado local cuando las props cambian
   useEffect(() => {
     setUsers(initialUsers);
   }, [initialUsers]);
@@ -58,11 +48,8 @@ export default function UserManagement({ user: loggedInUser, users: initialUsers
       const fetchData = async () => {
         setIsLoading(true);
         try {
-          // Se quita la carga de "users" porque ya viene de App.js
           const representativesSnapshot = await getDocs(collection(db, "representatives"));
-
           setRepresentatives(representativesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-          
           setLaboratories([{ id: 1, name: 'Pets Pharma' }, { id: 2, name: 'Kiron' }, { id: 3, name: 'Vets Pharma' }]);
         } catch (error) {
           console.error("Error al cargar datos:", error);
@@ -96,7 +83,7 @@ export default function UserManagement({ user: loggedInUser, users: initialUsers
     );
   }
   
-  // MODIFICADO: Llama a los handlers de App.js en lugar de simular
+  // --- CAMBIO 2: Lógica de 'handleSaveUser' actualizada ---
   const handleSaveUser = async (e) => {
     e.preventDefault();
     
@@ -109,45 +96,47 @@ export default function UserManagement({ user: loggedInUser, users: initialUsers
         return;
     }
 
-    setIsLoading(true);
+    setIsSubmitting(true); // <-- Usamos el nuevo estado
     try {
       const dataToSave = {
         ...userToModify,
-        // Convierte el array de objetos de react-select a un array de IDs
         repsManaged: userToModify.repsManaged?.map(r => r.value) || []
       };
 
       if (isEditing) {
-        await handlers.handleUpdateItem(dataToSave); // Se usa el handler de App.js
+        await handlers.handleUpdateItem(dataToSave);
         toast.success("Usuario actualizado correctamente.");
       } else {
-        await handlers.handleAddItem(dataToSave); // Se usa el handler de App.js
+        await handlers.handleAddItem(dataToSave);
         toast.success("Usuario agregado correctamente.");
       }
       closeFormModal();
     } catch (error) {
-      console.error("Error al guardar usuario:", error);
-      toast.error("Ocurrió un error al guardar el usuario.");
+      console.error("Error al guardar usuario (desde Cloud Function):", error);
+      // ¡ESTA ES LA CORRECCIÓN CLAVE!
+      // Muestra el mensaje de error real que viene del backend.
+      toast.error(`Error: ${error.message || "Ocurrió un error al guardar."}`);
     }
-    setIsLoading(false);
+    setIsSubmitting(false); // <-- Usamos el nuevo estado
   };
 
-  // MODIFICADO: Llama al handler de App.js para eliminar
+  // --- CAMBIO 3: Lógica de 'confirmDelete' actualizada ---
   const confirmDelete = async () => {
     if (!userToModify) return;
-    setIsLoading(true);
+    setIsSubmitting(true); // <-- Usamos el nuevo estado
     try {
-        await handlers.handleDeleteItem(userToModify.id); // Se usa el handler de App.js
+        await handlers.handleDeleteItem(userToModify.id);
         toast.success("Usuario eliminado correctamente.");
         closeDeleteConfirm();
     } catch (error) {
-        console.error("Error al eliminar usuario:", error);
-        toast.error("Ocurrió un error al eliminar el usuario.");
+        console.error("Error al eliminar usuario (desde Cloud Function):", error);
+        // Muestra el mensaje de error real
+        toast.error(`Error: ${error.message || "Ocurrió un error al eliminar."}`);
     }
-    setIsLoading(false);
+    setIsSubmitting(false); // <-- Usamos el nuevo estado
   };
 
-  // --- Handlers de UI (sin cambios) ---
+  // --- (El resto de los handlers no cambian) ---
   const openAddModal = () => {
     setIsEditing(false);
     setUserToModify({ email: '', password: '', name: '', username: '', role: '', laboratory: '', repsManaged: [] });
@@ -156,12 +145,12 @@ export default function UserManagement({ user: loggedInUser, users: initialUsers
   
   const openEditModal = (user) => {
     setIsEditing(true);
-    // Convierte el array de IDs de la BD al formato que react-select necesita
     const managedRepsAsOptions = (user.repsManaged || []).map(repId => 
         representativeOptions.find(opt => opt.value === repId)
-    ).filter(Boolean); // .filter(Boolean) elimina cualquier resultado undefined si un ID no se encuentra
+    ).filter(Boolean);
 
-    setUserToModify({ ...user, email: user.id, password: '', repsManaged: managedRepsAsOptions });
+    // Asegúrate de que 'id' (el email) esté en el objeto a modificar
+    setUserToModify({ ...user, id: user.id, email: user.id, password: '', repsManaged: managedRepsAsOptions });
     setIsFormModalOpen(true);
   };
 
@@ -193,7 +182,6 @@ export default function UserManagement({ user: loggedInUser, users: initialUsers
     return <div className="p-6 text-center"><p>Cargando...</p></div>;
   }
 
-  // --- JSX (sin cambios) ---
   return (
     <div className="p-4 md:p-6 bg-white rounded-xl shadow-lg">
       <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
@@ -203,7 +191,6 @@ export default function UserManagement({ user: loggedInUser, users: initialUsers
 
       <div className="overflow-x-auto">
         <table className="min-w-full text-left">
-          {/* ... (el resto del JSX de la tabla es idéntico) ... */}
           <thead className="bg-gray-100">
             <tr>
               <th className="py-3 px-4 text-sm font-semibold text-gray-700">Email (ID)</th>
@@ -234,7 +221,7 @@ export default function UserManagement({ user: loggedInUser, users: initialUsers
         <form onSubmit={handleSaveUser} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div><label className="block text-sm font-semibold">Email (login)</label><input type="email" name="email" value={userToModify?.email || ''} onChange={handleChange} className="w-full p-2 border rounded-lg" required disabled={isEditing} /></div>
-            <div><label className="block text-sm font-semibold">Contraseña</label><input type="password" name="password" value={userToModify?.password || ''} onChange={handleChange} className="w-full p-2 border rounded-lg" placeholder={isEditing ? "Dejar en blanco para no cambiar" : ""} required={!isEditing} /></div>
+            <div><label className="block text-sm font-semibold">Contraseña</label><input type="password" name="password" value={userToModify?.password || ''} onChange={handleChange} className="w-full p-2 border rounded-lg" placeholder={isEditing ? "Dejar en blanco para no cambiar" : "Contraseña de inicio"} required={!isEditing} /></div>
             <div><label className="block text-sm font-semibold">Nombre Completo</label><input type="text" name="name" value={userToModify?.name || ''} onChange={handleChange} className="w-full p-2 border rounded-lg" required /></div>
             <div><label className="block text-sm font-semibold">Nombre de Usuario</label><input type="text" name="username" value={userToModify?.username || ''} onChange={handleChange} className="w-full p-2 border rounded-lg" /></div>
             <div><label className="block text-sm font-semibold">Rol</label><select name="role" value={userToModify?.role || ''} onChange={handleChange} className="w-full p-2 border rounded-lg" required><option value="">Selecciona Rol</option>{availableRoles.map(role => (<option key={role} value={role}>{role}</option>))}</select></div>
@@ -268,7 +255,14 @@ export default function UserManagement({ user: loggedInUser, users: initialUsers
           </div>
           <div className="flex justify-end space-x-3 pt-4">
             <button type="button" onClick={closeFormModal} className="px-5 py-2.5 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancelar</button>
-            <button type="submit" className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700">{isEditing ? 'Guardar Cambios' : 'Agregar Usuario'}</button>
+            {/* --- CAMBIO 4: Botón de Submit actualizado --- */}
+            <button 
+              type="submit" 
+              className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-blue-300"
+              disabled={isSubmitting} // <-- Deshabilita el botón mientras se envía
+            >
+              {isSubmitting ? (isEditing ? 'Guardando...' : 'Agregando...') : (isEditing ? 'Guardar Cambios' : 'Agregar Usuario')}
+            </button>
           </div>
         </form>
       </Modal>
@@ -279,7 +273,14 @@ export default function UserManagement({ user: loggedInUser, users: initialUsers
           <p className="mt-4 text-gray-700">¿Estás seguro? Esto eliminará el perfil y el acceso del usuario <span className='font-bold'>{userToModify?.name}</span> de forma permanente.</p>
           <div className="flex justify-center space-x-4 mt-6">
             <button onClick={closeDeleteConfirm} className="px-5 py-2.5 bg-gray-200 font-semibold rounded-lg hover:bg-gray-300">Cancelar</button>
-            <button onClick={confirmDelete} className="px-5 py-2.5 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700">Sí, eliminar</button>
+            {/* --- CAMBIO 5: Botón de Eliminar actualizado --- */}
+            <button 
+              onClick={confirmDelete} 
+              className="px-5 py-2.5 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 disabled:bg-red-300"
+              disabled={isSubmitting} // <-- Deshabilita el botón mientras se elimina
+            >
+              {isSubmitting ? 'Eliminando...' : 'Sí, eliminar'}
+            </button>
           </div>
         </div>
       </Modal>

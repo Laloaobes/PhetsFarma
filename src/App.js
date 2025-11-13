@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
+import { Toaster } from 'react-hot-toast';
 
 // Importa componentes de la aplicación
 import AdminPanel from './components/AdminPanel';
@@ -16,6 +17,9 @@ import Login from './components/Login';
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
 import { db } from './firebase';
 import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, setDoc, getDoc } from "firebase/firestore";
+// <-- AÑADIR ESTAS LÍNEAS para llamar a las Cloud Functions
+import { getFunctions, httpsCallable } from "firebase/functions";
+
 
 // --- DATOS LOCALES ---
 const initialData = {
@@ -52,8 +56,6 @@ export default function App() {
                         email: firebaseUser.email,
                         ...userDocSnap.data()
                     });
-                    // ✅ CORRECCIÓN: No cambiar la vista aquí directamente.
-                    // El estado del usuario controlará qué se renderiza.
                 } else {
                     console.error("Usuario autenticado pero sin perfil en Firestore.");
                     await signOut(auth);
@@ -65,7 +67,6 @@ export default function App() {
         });
 
         return () => unsubscribe();
-    // ✅ CORRECCIÓN: El array de dependencias debe estar vacío para que se ejecute solo una vez.
     }, []);
 
     useEffect(() => {
@@ -78,7 +79,6 @@ export default function App() {
             return;
         }
 
-        // Si hay un usuario, la vista por defecto debe ser orderForm
         if (currentView === 'login') {
             setCurrentView('orderForm');
         }
@@ -98,12 +98,12 @@ export default function App() {
             unsubDists();
             unsubUsers();
         };
-    }, [user, currentView]); // Depende de user para activar/desactivar
+    }, [user, currentView]);
 
     const handleLogout = () => {
         const auth = getAuth();
         signOut(auth).then(() => {
-            setCurrentView('login'); // Asegurarse de volver al login al cerrar sesión
+            setCurrentView('login');
         });
     };
 
@@ -153,21 +153,59 @@ export default function App() {
 
     const userHandlers = {
         handleAddItem: async (newUser) => {
+            // "newUser" es el objeto que viene del formulario de UserManagement
+            // (Incluye email, password, name, role, etc.)
+            
+            // 1. Preparamos la llamada a la Cloud Function 'saveUser'
+            const functions = getFunctions();
+            const saveUser = httpsCallable(functions, 'saveUser');
+            
             try {
-                const userDocRef = doc(db, "users", newUser.email);
-                await setDoc(userDocRef, { name: newUser.name, username: newUser.username, role: newUser.role, laboratory: newUser.laboratory || '', repsManaged: newUser.repsManaged || [] });
-            } catch (error) { console.error("Error adding user to Firestore: ", error); }
+                // 2. Llamamos a la función con los datos del formulario
+                // Le añadimos "isEditing: false" para que la función sepa que es un usuario NUEVO
+                await saveUser({ ...newUser, isEditing: false });
+                
+                // ¡Listo! onSnapshot detectará el nuevo usuario y actualizará la lista.
+                
+            } catch (error) {
+                console.error("Error al crear usuario (Cloud Function):", error);
+                // Lanzamos el error para que UserManagement.js lo atrape y muestre un toast
+                throw error;
+            }
         },
         handleUpdateItem: async (updatedUser) => {
+            // 1. Preparamos la llamada a la Cloud Function 'saveUser'
+            const functions = getFunctions();
+            const saveUser = httpsCallable(functions, 'saveUser');
+            
             try {
-                const userDocRef = doc(db, "users", updatedUser.id);
-                await updateDoc(userDocRef, { name: updatedUser.name, username: updatedUser.username, role: updatedUser.role, laboratory: updatedUser.laboratory || '', repsManaged: updatedUser.repsManaged || [] });
-            } catch (error) { console.error("Error updating user in Firestore: ", error); }
+                // 2. Llamamos a la función con los datos del formulario
+                // Le añadimos "isEditing: true" para que sepa que es una ACTUALIZACIÓN
+                // Usamos 'updatedUser.id' que es el email
+                await saveUser({ ...updatedUser, isEditing: true, id: updatedUser.id });
+                
+                // ¡Listo! onSnapshot detectará la actualización.
+                
+            } catch (error) {
+                console.error("Error al actualizar usuario (Cloud Function):", error);
+                throw error;
+            }
         },
-        handleDeleteItem: async (userId) => {
+        handleDeleteItem: async (userEmail) => {
+            // 1. Preparamos la llamada a la Cloud Function 'deleteUser'
+            const functions = getFunctions();
+            const deleteUser = httpsCallable(functions, 'deleteUser');
+            
             try {
-                await deleteDoc(doc(db, "users", userId));
-            } catch (error) { console.error("Error deleting user from Firestore: ", error); }
+                // 2. Llamamos a la función pasándole el email del usuario a borrar
+                await deleteUser({ email: userEmail });
+                
+                // ¡Listo! onSnapshot detectará la eliminación.
+
+            } catch (error) {
+                console.error("Error al eliminar usuario (Cloud Function):", error);
+                throw error;
+            }
         },
     };
 
@@ -205,6 +243,7 @@ export default function App() {
 
     return (
         <div className="min-h-screen bg-gray-100 flex flex-col">
+            <Toaster position="top-right" />
             {user && (
                 <AdminPanel onNavigate={handleNavigate} onLogout={handleLogout} currentView={currentView} user={user} />
             )}
