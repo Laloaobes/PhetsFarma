@@ -16,7 +16,7 @@ import Login from './components/Login';
 // ---- IMPORTS DE FIREBASE ----
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
 import { db } from './firebase';
-import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, setDoc, getDoc } from "firebase/firestore";
+import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, getDoc } from "firebase/firestore";
 // <-- AÑADIR ESTAS LÍNEAS para llamar a las Cloud Functions
 import { getFunctions, httpsCallable } from "firebase/functions";
 
