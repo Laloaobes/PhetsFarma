@@ -96,8 +96,8 @@ export default function ProductReportView({
     const [selectedProducts, setSelectedProducts] = useState([]);
     const [filterSeller, setFilterSeller] = useState('');
     const [filterDistributor, setFilterDistributor] = useState('');
-    const [startDate, setStartDate] = useState('');
-    const [endDate, setEndDate] = useState('');
+    const [startDate] = useState('');
+    const [endDate] = useState('');
     const [reportData, setReportData] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
 
