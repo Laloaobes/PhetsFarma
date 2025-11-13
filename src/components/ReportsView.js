@@ -184,35 +184,35 @@ export default function ReportsView({ onNavigate, distributors, laboratories, us
     const isFilterActive = useMemo(() => Object.values(appliedFilters).some(val => !!val), [appliedFilters]);
 
     const fetchSummary = useCallback(async () => {
-        try {
-            let summaryConstraints = [];
-            if (appliedFilters.seller) summaryConstraints.push(where("representative", "==", appliedFilters.seller));
-            if (appliedFilters.distributor) summaryConstraints.push(where("distributor", "==", appliedFilters.distributor));
-            if (appliedFilters.laboratory) summaryConstraints.push(where("laboratory", "==", appliedFilters.laboratory));
-            if (appliedFilters.startDate) {
-                const startOfDay = new Date(appliedFilters.startDate);
-                startOfDay.setUTCHours(0, 0, 0, 0);
-                summaryConstraints.push(where("date", ">=", startOfDay));
-            }
-            if (appliedFilters.endDate) {
-                const endOfDay = new Date(appliedFilters.endDate);
-                endOfDay.setUTCHours(23, 59, 59, 999);
-                summaryConstraints.push(where("date", "<=", endOfDay));
-            }
+        try {
+            let summaryConstraints = [];
+            if (appliedFilters.seller) summaryConstraints.push(where("representative", "==", appliedFilters.seller));
+            if (appliedFilters.distributor) summaryConstraints.push(where("distributor", "==", appliedFilters.distributor));
+            if (appliedFilters.laboratory) summaryConstraints.push(where("laboratory", "==", appliedFilters.laboratory));
+            if (appliedFilters.startDate) {
+                const startOfDay = new Date(appliedFilters.startDate);
+                startOfDay.setUTCHours(0, 0, 0, 0);
+                summaryConstraints.push(where("date", ">=", startOfDay));
+            }
+            if (appliedFilters.endDate) {
+                const endOfDay = new Date(appliedFilters.endDate);
+                endOfDay.setUTCHours(23, 59, 59, 999);
+                summaryConstraints.push(where("date", "<=", endOfDay));
+            }
 
-            const q = query(collection(db, "orders"), ...summaryConstraints);
-            
-            const snapshot = await getAggregateFromServer(q, {
-                totalOrders: count(),
-                salesTotal: sum('grandTotal')
-            });
+            const q = query(collection(db, "orders"), ...summaryConstraints);
+            
+            const snapshot = await getAggregateFromServer(q, {
+                totalOrders: count(),
+                salesTotal: sum('grandTotal')
+            });
 
-            setSummaryData({ totalOrders: snapshot.data().totalOrders, salesTotal: snapshot.data().salesTotal });
-        } catch (error) {
-            console.error("Error al calcular el resumen:", error);
-            toast.error("No se pudo calcular el resumen de totales.");
-        }
-    }, [appliedFilters]); 
+            setSummaryData({ totalOrders: snapshot.data().totalOrders, salesTotal: snapshot.data().salesTotal });
+        } catch (error) {
+            console.error("Error al calcular el resumen:", error);
+            toast.error("No se pudo calcular el resumen de totales.");
+        }
+    }, [appliedFilters]);
 
     const fetchOrders = useCallback(async (loadMore = false) => {
         if (loadMore && (!hasMore || isLoadingMore)) return;
@@ -259,7 +259,7 @@ export default function ReportsView({ onNavigate, distributors, laboratories, us
             setIsLoading(false);
             setIsLoadingMore(false);
         }
-    }, [appliedFilters, hasMore, isLoadingMore, lastVisible]);
+    }, [appliedFilters]);
 
     const handleApplyFilters = () => {
         let finalEndDate = endDateInput;

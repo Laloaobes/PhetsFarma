@@ -241,27 +241,16 @@ export default function ProductReportView({
                     </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t">
-                    <div>
-                        <label className="text-sm font-medium text-gray-600 mb-1 block">Vendedor (Opcional)</label>
-                        <Select options={sellerOptions} isClearable value={sellerOptions.find(o => o.value === filterSeller)} onChange={opt => setFilterSeller(opt ? opt.value : '')} placeholder="Todos" />
-                    </div>
-                    <div>
-                        <label className="text-sm font-medium text-gray-600 mb-1 block">Distribuidor (Opcional)</label>
-                        <Select options={distributorOptions} isClearable value={distributorOptions.find(o => o.value === filterDistributor)} onChange={opt => setFilterDistributor(opt ? opt.value : '')} placeholder="Todos" />
-                    </div>
-                    
-                    {/* --- AÑADE ESTOS DOS BLOQUES --- */}
-                    <div>
-                        <label className="text-sm font-medium text-gray-600 mb-1 block">Fecha de Inicio</label>
-                        <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full bg-gray-100 p-3 rounded-lg focus:outline-none text-sm h-[38px]" />
-                    </div>
-                    <div>
-                        <label className="text-sm font-medium text-gray-600 mb-1 block">Fecha de Fin</label>
-                        <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full bg-gray-100 p-3 rounded-lg focus:outline-none text-sm h-[38px]" />
-                    </div>
-                    {/* --- FIN DE BLOQUES A AÑADIR --- */}
-
-                </div>
+                    <div>
+                        <label className="text-sm font-medium text-gray-600 mb-1 block">Vendedor (Opcional)</label>
+                        <Select options={sellerOptions} isClearable value={sellerOptions.find(o => o.value === filterSeller)} onChange={opt => setFilterSeller(opt ? opt.value : '')} placeholder="Todos" />
+                    </div>
+                    <div>
+                        <label className="text-sm font-medium text-gray-600 mb-1 block">Distribuidor (Opcional)</label>
+                        <Select options={distributorOptions} isClearable value={distributorOptions.find(o => o.value === filterDistributor)} onChange={opt => setFilterDistributor(opt ? opt.value : '')} placeholder="Todos" />
+                    </div>
+                    
+                </div>
                 <div className="flex justify-end pt-2">
                     <button onClick={handleGenerateReport} disabled={isLoading || !selectedLab || selectedProducts.length === 0} className="flex items-center justify-center gap-2 px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 disabled:bg-blue-300 transition-colors">
                         {isLoading ? <Loader2 className="animate-spin" size={18} /> : <BarChart2 size={18} />}
